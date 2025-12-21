@@ -1,7 +1,16 @@
 import os
-import asyncio
-from pydantic import IPvAnyAddress
 import subprocess
+from pydantic import IPvAnyAddress
+
+
+class DeviceConnectionError(Exception):
+    """Raised when no ADB device is connected."""
+    pass
+
+
+class DeviceUnavailable(Exception):
+    """Raised when ADB device is offline or not authorized (Allow debugging not accepted)"""
+    pass
 
 
 class Adb:
@@ -26,10 +35,7 @@ class Adb:
 
         return adb_path
 
-    async def adb_execute(self, command: list[str], requires_device=False):
-
-        if requires_device:
-            pass
+    async def adb_execute(self, command: list[str]):
 
         try:
 
@@ -47,7 +53,7 @@ class Adb:
 
         return process
 
-    async def devices(self):
+    async def get_devices(self):
 
         adb_command = ["devices"]
 
@@ -98,22 +104,29 @@ class Adb:
 
         return
 
-    async def send_text_message(self, phone_number: str, message: str, device=None) -> str:
+    async def send_text_message(self, phone_number: str, message: str, device_name: str) -> str:
 
-        if not device:
+        if not phone_number and message and device_name:
+            raise ValueError("One or more required parameters were not specified!")
 
-            devices = await self.devices()
+        device_found = False
+        all_devices = await self.get_devices()
 
-            for device in devices:
+        for _ in all_devices:
 
-                if device['status'] == "device":
+            if _['id'] == device_name:
 
-                    device = device['id']
+                if _["status"] != "device":
 
-        print(f"device: {device}")
+                    raise DeviceUnavailable(f"This device is not authorized\nStatus: {_['status']}")
+
+                device_found = True
+
+        if not device_found:
+            raise DeviceConnectionError("No Authorized android device found. Please connect via USB or TCP")
 
         adb_command = [
-            "-s", device,
+            "-s", str(device_name),
             "shell", "service", "call", "isms", "5",
             "i32", "0",
             "s16", "com.android.mms.service",
@@ -128,35 +141,7 @@ class Adb:
         ]
 
         parcel = await self.adb_execute(
-            command=adb_command,
-            requires_device=True
+            command=adb_command
         )
 
         return parcel.stdout
-
-
-async def main():
-
-    adb_path = os.path.join(
-        "src",
-        "bin",
-        "adb.exe" if os.name == 'win' else 'adb'
-    )
-
-    adb = Adb(
-        adb_path=adb_path
-    )
-
-    devices = await adb.devices()
-    print(devices)
-
-    parcel = await adb.send_text_message("972539309365", "This is a test message from\nAndorid-SMS-API")
-
-    print(parcel)
-
-    return
-
-
-if __name__ == "__main__":
-
-    asyncio.run(main())
