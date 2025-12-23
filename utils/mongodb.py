@@ -48,3 +48,11 @@ class MongoDb:
         self.database = mongo_client[self.database_name]
 
         return mongo_client[self.database_name]
+
+    def get_user(self, username: str):
+
+        query = self.database[self.users_collection_name].find_one(
+            filter={"username": username}
+        )
+
+        return query

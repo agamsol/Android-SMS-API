@@ -14,16 +14,16 @@ class StatusResponseModel(BaseModel):
 
 
 router = APIRouter(
-    prefix="/status",
-    tags=["Health"]
+    prefix="/health",
+    tags=['Health']
 )
 
 
 @router.get(
-    "/",
+    "/status",
     response_model=StatusResponseModel,
     status_code=status.HTTP_200_OK,
-    summary="Get the status of the ADB-SMS-Gateaway"
+    summary="Get the status of the Android-SMS-API"
 )
 async def get_status():
 
