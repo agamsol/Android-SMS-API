@@ -1,5 +1,8 @@
 # Forked from agamsol/Reverse-Proxy-Access-Control-Manager (modified)
+from mailbox import Message
 from pymongo import MongoClient, database
+
+from utils.models.mongodb import User_Model, Message_Model
 
 
 class MongoDb:
@@ -48,6 +51,22 @@ class MongoDb:
         self.database = mongo_client[self.database_name]
 
         return mongo_client[self.database_name]
+
+    def insert_user(self, user_model: User_Model):
+
+        user_payload = self.database[self.users_collection_name].insert_one(
+            user_model.model_dump(mode="json")
+        )
+
+        return user_payload
+
+    def insert_message(self, message_model: Message_Model):
+
+        message_payload = self.database[self.users_collection_name].insert_one(
+            message_model.model_dump(mode="json")
+        )
+
+        return message_payload
 
     def get_user(self, username: str):
 

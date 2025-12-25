@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from utils.adb import Adb  # noqa: F401
 from utils.mongodb import MongoDb
-from routes import health
+from routes import health, authentication
 
 load_dotenv()
 
@@ -29,6 +29,11 @@ app = FastAPI(
 app.include_router(
     router=health.router,
     tags=["Health"]
+)
+
+app.include_router(
+    router=authentication.router,
+    tags=["Authentication"]
 )
 
 if __name__ == "__main__":

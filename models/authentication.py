@@ -8,7 +8,7 @@ class BaseUser(BaseModel):
 
 
 class CreateUser(BaseUser):
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")
 
     @field_validator("password")
     @classmethod
