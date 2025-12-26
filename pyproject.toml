@@ -12,4 +12,5 @@ dependencies = [
     "jwt>=1.4.0",
     "pymongo>=4.15.5",
     "uvicorn>=0.38.0",
+    "python-multipart>=0.0.21",
 ]

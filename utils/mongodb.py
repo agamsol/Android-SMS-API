@@ -1,5 +1,3 @@
-# Forked from agamsol/Reverse-Proxy-Access-Control-Manager (modified)
-from mailbox import Message
 from pymongo import MongoClient, database
 
 from utils.models.mongodb import User_Model, Message_Model

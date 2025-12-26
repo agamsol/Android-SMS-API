@@ -1,9 +1,11 @@
 import re
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class BaseUser(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     username: str = Field(min_length=3, max_length=32)
 
 
@@ -25,6 +27,11 @@ class CreateUser(BaseUser):
         return passwd
 
 
+class AdditionalAccountData(BaseUser):
+    messages_limit: int = 50
+    administrator: bool = False
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -32,3 +39,4 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+    exp: Optional[int] = None
