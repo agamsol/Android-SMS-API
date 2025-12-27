@@ -1,11 +1,11 @@
 import re
-from typing import Optional
+from typing import Annotated, Optional
+from fastapi import Form
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class BaseUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     username: str = Field(min_length=3, max_length=32)
 
 
@@ -40,3 +40,16 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
     exp: Optional[int] = None
+
+
+class LoginObtainToken(BaseModel):
+    username: Annotated[str, Form(min_length=3, max_length=32)]
+    password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
+    remember_me: Annotated[bool, Form()] = False
+
+
+class CreateUserParams(BaseModel):
+    username: Annotated[str, Form(min_length=3, max_length=32)]
+    password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
+    messages_limit: Annotated[int, Form()] = 50
+    administrator: Annotated[bool, Form()] = False

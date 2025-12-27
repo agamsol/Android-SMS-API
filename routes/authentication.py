@@ -4,7 +4,7 @@ from typing import Literal, Annotated, Dict, Any  # noqa: F401
 from pydantic import BaseModel, Field  # noqa: F401
 from fastapi import Depends, HTTPException, status, APIRouter, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from models.authentication import CreateUser, Token, AdditionalAccountData
+from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken
 from utils.models.mongodb import User_Model
 from utils.mongodb import MongoDb
 from utils.secure import JWToken, Hash
@@ -124,11 +124,13 @@ async def login_for_access_token(
 )
 async def create_account(
     token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    username: Annotated[str, Form()],
-    password: Annotated[str, Form()],
-    messages_limit: Annotated[int, Form()] = 50,
-    administrator: Annotated[bool, Form()] = False
+    create_user_form: Annotated[CreateUserParams, Depends()],
 ):
+
+    username = create_user_form.username
+    password = create_user_form.password
+    messages_limit = create_user_form.messages_limit
+    administrator = create_user_form.administrator
 
     password_data = CreateUser(username=username, password=password)
     credentials = AdditionalAccountData(
@@ -156,12 +158,12 @@ async def create_account(
 
     user_payload = User_Model(
         username=credentials.username,
-        password=hashed_password,
+        hashed_password=hashed_password,
         messages_limit=credentials.messages_limit,
         administrator=credentials.administrator
     )
 
-    mongodb_helper.insert_user(user_payload.model_dump(mode="json"))
+    mongodb_helper.insert_user(user_payload)
 
     return user_payload
 
