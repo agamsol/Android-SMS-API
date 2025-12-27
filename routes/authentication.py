@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from typing import Annotated, Dict, Any
+from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer
 from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse
@@ -31,9 +31,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 # POST Create token
 # DELETE Delete Users
 
-router = APIRouter(
-    prefix="/auth",
-)
+router = APIRouter()
 
 
 async def authenticate_with_token(

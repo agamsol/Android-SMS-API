@@ -6,12 +6,10 @@ from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from utils.adb import Adb  # noqa: F401
 from utils.mongodb import MongoDb
-from routes import health, authentication
+from routes import health, authentication, adb
 from models.errors import ErrorResponse
 
 load_dotenv()
-
-ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
 
 mongodb_helper = MongoDb(
     database_name=os.getenv("MONGODB_DATABASE_NAME")
@@ -141,7 +139,13 @@ app.include_router(
 )
 
 app.include_router(
-    router=authentication.router
+    router=authentication.router,
+    prefix="/auth"
+)
+
+app.include_router(
+    router=adb.router,
+    prefix="/adb"
 )
 
 if __name__ == "__main__":
