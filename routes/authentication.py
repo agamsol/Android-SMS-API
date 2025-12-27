@@ -4,7 +4,7 @@ from typing import Literal, Annotated, Dict, Any  # noqa: F401
 from pydantic import BaseModel, Field  # noqa: F401
 from fastapi import Depends, HTTPException, status, APIRouter, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken
+from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token
 from utils.models.mongodb import User_Model
 from utils.mongodb import MongoDb
 from utils.secure import JWToken, Hash
@@ -47,6 +47,8 @@ async def authenticate_with_token(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    print(token)
+
     try:
 
         token_data = await JWToken.verify(token)
@@ -77,7 +79,7 @@ async def authenticate_with_token(
     response_model=Token
 )
 async def login_for_access_token(
-    credentials: Annotated[OAuth2PasswordRequestForm, Depends()]
+    credentials: Annotated[LoginObtainToken, Depends(login_obtain_token)]
 ):
 
     credentials_exception = HTTPException(
@@ -108,7 +110,7 @@ async def login_for_access_token(
     if not verified_user:
         raise credentials_exception
 
-    access_token = await JWToken.create(username=ADMIN_USERNAME)
+    access_token = await JWToken.create(username=credentials.username)
 
     return Token(
         access_token=access_token,
@@ -119,7 +121,7 @@ async def login_for_access_token(
 @router.post(
     "/create-account",
     summary="Create an account with a monthly limitted messages cap",
-    response_model=User_Model,
+    response_model=AdditionalAccountData,
     status_code=status.HTTP_201_CREATED
 )
 async def create_account(
@@ -140,6 +142,7 @@ async def create_account(
     )
 
     # ONLY ADMINISTRATOR ACCOUNTS CAN CREATE NEW ACCOUNTS
+    print(token)
     if not token.administrator:
 
         raise HTTPException(
@@ -170,7 +173,7 @@ async def create_account(
 
 @router.get(
     "/@me",
-    response_model=User_Model,
+    response_model=AdditionalAccountData,
     status_code=status.HTTP_200_OK
 )
 async def get_current_user(
