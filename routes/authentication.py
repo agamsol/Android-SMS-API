@@ -1,10 +1,9 @@
 import os
 from dotenv import load_dotenv
-from typing import Literal, Annotated, Dict, Any  # noqa: F401
-from pydantic import BaseModel, Field  # noqa: F401
-from fastapi import Depends, HTTPException, status, APIRouter, Form
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token
+from typing import Annotated, Dict, Any
+from fastapi import Depends, HTTPException, status, APIRouter
+from fastapi.security import OAuth2PasswordBearer
+from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse
 from utils.models.mongodb import User_Model
 from utils.mongodb import MongoDb
 from utils.secure import JWToken, Hash
@@ -39,15 +38,14 @@ router = APIRouter(
 
 async def authenticate_with_token(
     token: Annotated[str, Depends(oauth2_scheme)],
-) -> Dict[str, Any]:
+) -> AdditionalAccountData:
+    """This function verifies that the request has a valid token input"""
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
-    print(token)
 
     try:
 
@@ -74,9 +72,23 @@ async def authenticate_with_token(
     )
 
 
+@router.get(
+    "/@me",
+    response_model=AdditionalAccountData,
+    status_code=status.HTTP_200_OK,
+    tags=["Authentication"]
+)
+async def get_current_user(
+    current_user: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
+):
+
+    return current_user
+
+
 @router.post(
     "/login",
-    response_model=Token
+    response_model=Token,
+    tags=["Authentication"]
 )
 async def login_for_access_token(
     credentials: Annotated[LoginObtainToken, Depends(login_obtain_token)]
@@ -119,20 +131,21 @@ async def login_for_access_token(
 
 
 @router.post(
-    "/create-account",
+    "/administrator/create-account",
     summary="Create an account with a monthly limitted messages cap",
     response_model=AdditionalAccountData,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    tags=["Account Management"]
 )
 async def create_account(
     token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    create_user_form: Annotated[CreateUserParams, Depends()],
+    body: CreateUserParams,
 ):
 
-    username = create_user_form.username
-    password = create_user_form.password
-    messages_limit = create_user_form.messages_limit
-    administrator = create_user_form.administrator
+    username = body.username
+    password = body.password
+    messages_limit = body.messages_limit
+    administrator = body.administrator
 
     password_data = CreateUser(username=username, password=password)
     credentials = AdditionalAccountData(
@@ -141,14 +154,8 @@ async def create_account(
         administrator=administrator
     )
 
-    # ONLY ADMINISTRATOR ACCOUNTS CAN CREATE NEW ACCOUNTS
-    print(token)
     if not token.administrator:
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You are not authorized to create new accounts."
-        )
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
 
     if mongodb_helper.get_user(credentials.username) or credentials.username == ADMIN_PASSWORD:
 
@@ -171,13 +178,141 @@ async def create_account(
     return user_payload
 
 
-@router.get(
-    "/@me",
-    response_model=AdditionalAccountData,
-    status_code=status.HTTP_200_OK
+@router.put(
+    "/administrator/reset-password",
+    summary="Reset password for a specific account. Users can reset their own password without administrator privileges.",
+    response_model=AccountConfirmationResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Account Management"]
 )
-async def get_current_user(
-    current_user: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
+async def reset_account_password(
+    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+    body: ResetAccountPasswordRequest,
 ):
 
-    return current_user
+    # USER IS ALLOWED TO RESET ITS OWN PASSWORD WITHOUT ADMINISTRATOR PERMISSION WHILE ADMINISTRATORS CAN ALSO RESET ITS PASSWORD
+    if not token.administrator and token.username != body.username:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    if body.username == ADMIN_USERNAME:
+
+        raise HTTPException(
+            detail=f"Cannot reset password for '{ADMIN_USERNAME}' account. It is a hardcoded system user; change it in the config file",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+    user = mongodb_helper.get_user(body.username)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found"
+        )
+
+    password_data = CreateUser(username=body.username, password=body.password)
+
+    hashed_password = await Hash.create(password_data.password)
+
+    account_password_changed = mongodb_helper.change_password(password_data.username, hashed_password)
+
+    if not account_password_changed:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password"
+        )
+
+    return AccountConfirmationResponse(
+        username=body.username,
+        detail="Account password has been changed"
+    )
+
+
+@router.put(
+    "/administrator/message-limit",
+    summary="Update monthly message limit for a user",
+    response_model=MessageLimitUpdateResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Account Management"]
+)
+async def update_message_limit(
+    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+    body: UpdateMessageLimitRequest,
+):
+
+    if not token.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    if body.username == ADMIN_USERNAME:
+
+        raise HTTPException(
+            detail=f"Cannot update message limit for '{ADMIN_USERNAME}' account. It is a hardcoded system user",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+    user = mongodb_helper.get_user(body.username)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found"
+        )
+
+    account_updated = mongodb_helper.update_message_limit(body.username, body.messages_limit)
+
+    if not account_updated:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update message limit"
+        )
+
+    return MessageLimitUpdateResponse(
+        username=body.username,
+        detail="Message limit has been updated",
+        messages_limit=body.messages_limit
+    )
+
+
+@router.delete(
+    "/administrator/delete-account",
+    summary="",
+    response_model=AccountConfirmationResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Account Management"]
+)
+async def delete_account(
+    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+    username: BaseUser
+):
+
+    if not token.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    # PREVENT/HANDLE HARDCODED USER DELETION
+    if token.username == ADMIN_USERNAME:
+
+        raise HTTPException(
+            detail=f"Cannot delete the '{ADMIN_USERNAME}' account because it is a hardcoded system user",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+    # PREVENT SELF ACCOUNT DELETION
+    if token.username == username:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot delete your own account"
+        )
+
+    account_deleted = mongodb_helper.delete_account(username)
+
+    if not account_deleted:
+
+        return AccountConfirmationResponse(
+            username=username,
+            detail="Account not found or could not be deleted"
+        )
+
+    return AccountConfirmationResponse(
+        username=username,
+        detail="Account has been deleted"
+    )

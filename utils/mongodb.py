@@ -50,6 +50,14 @@ class MongoDb:
 
         return mongo_client[self.database_name]
 
+    def get_user(self, username: str):
+
+        query = self.database[self.users_collection_name].find_one(
+            filter={"username": username}
+        )
+
+        return query
+
     def insert_user(self, user_model: User_Model):
 
         user_payload = self.database[self.users_collection_name].insert_one(
@@ -58,18 +66,36 @@ class MongoDb:
 
         return user_payload
 
+    def change_password(self, username: str, new_password: str):
+
+        user_password_changed = self.database[self.users_collection_name].find_one_and_update(
+            filter={"username": username},
+            update={"$set": {"hashed_password": new_password}}
+        )
+
+        return user_password_changed
+
+    def update_message_limit(self, username: str, messages_limit: int):
+
+        user_updated = self.database[self.users_collection_name].find_one_and_update(
+            filter={"username": username},
+            update={"$set": {"messages_limit": messages_limit}}
+        )
+
+        return user_updated
+
+    def delete_account(self, username: str):
+
+        deleted_user = self.database[self.users_collection_name].find_one_and_delete(
+            filter={"username": username}
+        )
+
+        return deleted_user
+
     def insert_message(self, message_model: Message_Model):
 
-        message_payload = self.database[self.users_collection_name].insert_one(
+        message_payload = self.database[self.messages_collection_name].insert_one(
             message_model.model_dump(mode="json")
         )
 
         return message_payload
-
-    def get_user(self, username: str):
-
-        query = self.database[self.users_collection_name].find_one(
-            filter={"username": username}
-        )
-
-        return query
