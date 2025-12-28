@@ -1,5 +1,6 @@
 import os
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -7,9 +8,13 @@ from dotenv import load_dotenv
 from utils.adb import Adb  # noqa: F401
 from utils.mongodb import MongoDb
 from routes import health, authentication, adb
+from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
 
 load_dotenv()
+
+ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
+ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
 
 mongodb_helper = MongoDb(
     database_name=os.getenv("MONGODB_DATABASE_NAME")
@@ -22,9 +27,35 @@ mongodb = mongodb_helper.connect(
     password=os.getenv("MONGODB_PASSWORD")
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    if ADB_AUTO_CONNECT and ADB_DEFAULT_DEVICE:
+
+        try:
+            print(f"Auto-connecting to {ADB_DEFAULT_DEVICE}...")
+
+            result = await adb_library.connect_device(ADB_DEFAULT_DEVICE)
+
+            response_detail = "ADB Error while connecting to device!"
+
+            if "connected" in result.stdout or "already" in result.stdout:
+
+                response_detail = "ADB is now connected to device"
+
+            print(f"ADB Connection Status: {response_detail}")
+
+        except Exception as e:
+            print(f"Failed to auto-connect to ADB: {e}")
+
+    yield
+
+
 app = FastAPI(
     title="Android-SMS-API",
     description="Turn your Android phone into a programmable SMS server. A lightweight HTTP API wrapper around ADB for sending text messages over cellular network",
+    lifespan=lifespan,
     responses={
         400: {
             "model": ErrorResponse,

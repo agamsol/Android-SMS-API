@@ -92,6 +92,14 @@ class MongoDb:
 
         return deleted_user
 
+    def count_messages(self, username: str) -> int:
+
+        messages_amount = self.database[self.messages_collection_name].count_documents(
+            filter={"username": username}
+        )
+
+        return messages_amount
+
     def insert_message(self, message_model: Message_Model):
 
         message_payload = self.database[self.messages_collection_name].insert_one(

@@ -35,7 +35,7 @@ class Adb:
 
         return adb_path
 
-    async def adb_execute(self, command: list[str]):
+    async def adb_execute(self, command: list[str], timeout=10):
 
         try:
 
@@ -44,7 +44,7 @@ class Adb:
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=10
+                timeout=timeout
             )
 
         except FileNotFoundError:
@@ -104,9 +104,9 @@ class Adb:
 
         return
 
-    async def send_text_message(self, phone_number: str, message: str, device_name: str) -> str:
+    async def send_text_message(self, phone_number: str, message: str, device_name: str) -> bool:
 
-        if not phone_number and message and device_name:
+        if not phone_number and message:
             raise ValueError("One or more required parameters were not specified!")
 
         device_found = False
@@ -144,4 +144,9 @@ class Adb:
             command=adb_command
         )
 
-        return parcel.stdout
+        print(parcel.stdout)
+
+        if "Result: Parcel(00000000    '....')" == parcel.stdout:
+            return False
+
+        return True

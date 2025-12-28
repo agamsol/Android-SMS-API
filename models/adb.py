@@ -1,6 +1,5 @@
-from typing import Annotated, Literal, Optional
-from fastapi import Form, HTTPException, status
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 from models.authentication import BaseUser
 
 
@@ -20,4 +19,45 @@ class AdbListDevices(BaseModel):
 
 
 class AdbDetailResponse(BaseModel):
-    detail: Literal["ADB server has been terminated"]
+    detail: Literal[
+        "ADB server has been terminated",
+        "ADB is now connected to device",
+        "ADB Error while connecting to device!",
+        "Message has been successfully sent"
+    ]
+
+
+class AdbConnectDeviceRequest(BaseModel):
+    device_id: str = Field(..., min_length=4, max_length=35)
+
+
+class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
+    adb_output: str = Field(..., max_length=99)
+
+
+class AdbSendTextMessageRequest(AdbConnectDeviceRequest):
+    phone_number: str = Field(
+        ...,
+        pattern=r"^(972|0)5[023458]\d{7}$",
+        description="Must start with 05x (10 digits) or 9725x (12 digits). Allowed providers: 0,2,3,4,5,8."
+    )
+    message: str
+
+
+class AdbMessageSentResponse(BaseUser, AdbDetailResponse):
+    messages_sent: int
+    message_content: str
+
+
+class AdbShellExecuteRequest(AdbConnectDeviceRequest):
+    select_device: bool = True
+    command: list[str] = ['shell', 'ping', '-c', '1', '8.8.8.8']
+    adb_timeout: int = 10
+
+
+class AdbProcessResult(BaseModel):
+    """Model representing the result of an ADB command execution"""
+    args: list[str] = Field(..., description="The command that was executed")
+    returncode: int = Field(..., description="Exit status of the process (0 usually means success)")
+    stdout: str = Field(..., description="Standard output from the command")
+    stderr: str = Field(..., description="Standard error from the command")
