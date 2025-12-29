@@ -1,6 +1,26 @@
-from typing import Literal
+import os
+from dotenv import load_dotenv
+from typing import Literal, Optional
+from fastapi import HTTPException, status
 from pydantic import BaseModel, Field
+
 from models.authentication import BaseUser
+
+load_dotenv()
+
+ADB_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_SHELL_EXECUTION_ROUTE_ENABLED", "true").lower() == "true"
+
+
+def execution_route_enabled():
+
+    if not ADB_SHELL_EXECUTION_ROUTE_ENABLED:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This feature is currently disabled in the server configuration."
+        )
+
+    return
 
 
 class AdbListDevices(BaseModel):
@@ -35,7 +55,8 @@ class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
     adb_output: str = Field(..., max_length=99)
 
 
-class AdbSendTextMessageRequest(AdbConnectDeviceRequest):
+class AdbSendTextMessageRequest(BaseModel):
+    device_id: Optional[str] = Field(None, min_length=4, max_length=35, description="The unique identifier (serial) of the Android device. If omitted, a random available device will be selected.", examples=[None])
     phone_number: str = Field(
         ...,
         pattern=r"^(972|0)5[023458]\d{7}$",
@@ -44,7 +65,7 @@ class AdbSendTextMessageRequest(AdbConnectDeviceRequest):
     message: str
 
 
-class AdbMessageSentResponse(BaseUser, AdbDetailResponse):
+class AdbMessageSentResponse(BaseUser, AdbDetailResponse, AdbConnectDeviceRequest):
     messages_sent: int
     message_content: str
 

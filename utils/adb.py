@@ -1,5 +1,7 @@
 import os
+import re
 import subprocess
+from typing import Optional
 from pydantic import IPvAnyAddress
 
 
@@ -104,7 +106,7 @@ class Adb:
 
         return
 
-    async def send_text_message(self, phone_number: str, message: str, device_name: str) -> bool:
+    async def send_text_message(self, phone_number: str, message: str, device_name:  Optional[str]) -> tuple:
 
         if not phone_number and message:
             raise ValueError("One or more required parameters were not specified!")
@@ -114,9 +116,12 @@ class Adb:
 
         for _ in all_devices:
 
+            if not device_name and _['status'] == "device":  # Choose as a default device
+                device_name = _['id']
+
             if _['id'] == device_name:
 
-                if _["status"] != "device":
+                if _['status'] != "device":
 
                     raise DeviceUnavailable(f"This device is not authorized\nStatus: {_['status']}")
 
@@ -144,9 +149,7 @@ class Adb:
             command=adb_command
         )
 
-        print(parcel.stdout)
+        if re.search(r"Result: Parcel\([0-9a-fA-F]+\s+'.*'\)", str(parcel.stdout)):
+            return True, str(device_name)
 
-        if "Result: Parcel(00000000    '....')" == parcel.stdout:
-            return False
-
-        return True
+        return False, str(device_name)

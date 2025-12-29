@@ -6,15 +6,16 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from utils.models.mongodb import Message_Model
 from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
-from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult
+from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, execution_route_enabled
 from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
 from utils.mongodb import MongoDb
 
+load_dotenv()
+
 ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
+ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED", "false").lower() == "true"
 
 adb = Adb(ADB_PATH)
-
-load_dotenv()
 
 router = APIRouter(
     tags=["Android Debug Bridge"]
@@ -116,7 +117,7 @@ async def adb_send_text_message(
 
     try:
 
-        parcel_sent = await adb.send_text_message(
+        parcel_sent, device_name = await adb.send_text_message(
             phone_number=body.phone_number,
             message=body.message,
             device_name=body.device_id
@@ -140,7 +141,8 @@ async def adb_send_text_message(
                 detail="Message has been successfully sent",
                 username=account.username,
                 messages_sent=messages_sent,
-                message_content=body.message
+                message_content=body.message,
+                device_id=device_name
             )
 
         raise DeviceConnectionError("Operation failed. This ADB command appears to be incompatible with your device's Android version.")
@@ -164,7 +166,8 @@ async def adb_send_text_message(
     "/shell-execute",
     summary="Execute a custom shell command on a specific device",
     status_code=status.HTTP_200_OK,
-    response_model=AdbProcessResult
+    response_model=AdbProcessResult,
+    dependencies=[Depends(execution_route_enabled)]
 )
 async def adb_shell_execute(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],

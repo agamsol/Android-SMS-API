@@ -25,12 +25,6 @@ mongodb = mongodb_helper.connect(
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-# POST Create Users
-# PUT user limit
-# POST Create token
-# DELETE Delete Users
-
 router = APIRouter()
 
 

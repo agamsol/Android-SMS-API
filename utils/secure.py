@@ -8,9 +8,8 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-if not JWT_SECRET:
+if not JWT_SECRET or JWT_SECRET == "<RANDOM_SECURE_STRING>":
     raise RuntimeError("JWT_SECRET is not set in .env")
-
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
