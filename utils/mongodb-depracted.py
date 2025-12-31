@@ -1,6 +1,8 @@
-from pymongo import MongoClient, database
+# NOTE: THIS MODULE HAS BEEN DEPRACTED AND IS HERE JUST FOR REFRENCING THE NEW SQLITE3 LIBRARY
+# THIS LIBRARY WILL BE DELETED SOON!
 
-from utils.models.mongodb import User_Model, Message_Model
+from pymongo import MongoClient, database
+from utils.models.database import User_Model, Message_Model
 
 
 class MongoDb:
@@ -107,3 +109,7 @@ class MongoDb:
         )
 
         return message_payload
+
+
+# NOTE: THIS MODULE HAS BEEN DEPRACTED AND IS HERE JUST FOR REFRENCING THE NEW SQLITE3 LIBRARY
+# THIS LIBRARY WILL BE DELETED SOON!

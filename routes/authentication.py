@@ -4,8 +4,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer
 from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse
-from utils.models.mongodb import User_Model
-from utils.mongodb import MongoDb
+from utils.models.database import User_Model
+from utils.database import SQLiteDb
 from utils.secure import JWToken, Hash
 
 load_dotenv()
@@ -13,16 +13,9 @@ load_dotenv()
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-mongodb_helper = MongoDb(
-    database_name=os.getenv("MONGODB_DATABASE_NAME")
-)
-
-mongodb = mongodb_helper.connect(
-    host=os.getenv("MONGODB_HOST"),
-    port=int(os.getenv("MONGODB_PORT")),
-    username=os.getenv("MONGODB_USERNAME"),
-    password=os.getenv("MONGODB_PASSWORD")
-)
+db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
+db_helper = SQLiteDb(database_name=db_filename)
+database = db_helper.connect()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 router = APIRouter()
@@ -54,7 +47,7 @@ async def authenticate_with_token(
             administrator=True
         )
 
-    user = mongodb_helper.get_user(token_data.username)
+    user = db_helper.get_user(token_data.username)
 
     if user is None:
         raise credentials_exception
@@ -104,7 +97,7 @@ async def login_for_access_token(
             token_type="bearer"
         )
 
-    user_payload: dict = mongodb_helper.get_user(username=credentials.username)
+    user_payload: dict = db_helper.get_user(username=credentials.username)
 
     if not user_payload:
         raise credentials_exception
@@ -149,7 +142,7 @@ async def create_account(
     if not token.administrator:
         raise MUST_BE_ADMINISTRATOR_EXCEPTION
 
-    if mongodb_helper.get_user(credentials.username) or credentials.username == ADMIN_PASSWORD:
+    if db_helper.get_user(credentials.username) or credentials.username == ADMIN_PASSWORD:
 
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -165,7 +158,7 @@ async def create_account(
         administrator=credentials.administrator
     )
 
-    mongodb_helper.insert_user(user_payload)
+    db_helper.insert_user(user_payload)
 
     return user_payload
 
@@ -193,7 +186,7 @@ async def reset_account_password(
             status_code=status.HTTP_403_FORBIDDEN
         )
 
-    user = mongodb_helper.get_user(body.username)
+    user = db_helper.get_user(body.username)
 
     if not user:
         raise HTTPException(
@@ -205,7 +198,7 @@ async def reset_account_password(
 
     hashed_password = await Hash.create(password_data.password)
 
-    account_password_changed = mongodb_helper.change_password(password_data.username, hashed_password)
+    account_password_changed = db_helper.change_password(password_data.username, hashed_password)
 
     if not account_password_changed:
         raise HTTPException(
@@ -241,7 +234,7 @@ async def update_message_limit(
             status_code=status.HTTP_403_FORBIDDEN
         )
 
-    user = mongodb_helper.get_user(body.username)
+    user = db_helper.get_user(body.username)
 
     if not user:
         raise HTTPException(
@@ -249,7 +242,7 @@ async def update_message_limit(
             detail="Account not found"
         )
 
-    account_updated = mongodb_helper.update_message_limit(body.username, body.messages_limit)
+    account_updated = db_helper.update_message_limit(body.username, body.messages_limit)
 
     if not account_updated:
         raise HTTPException(
@@ -295,7 +288,7 @@ async def delete_account(
             detail="Cannot delete your own account"
         )
 
-    account_deleted = mongodb_helper.delete_account(username)
+    account_deleted = db_helper.delete_account(username)
 
     if not account_deleted:
 

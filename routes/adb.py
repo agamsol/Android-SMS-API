@@ -4,32 +4,25 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
-from utils.models.mongodb import Message_Model
+from utils.models.database import Message_Model
 from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
 from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, execution_route_enabled
 from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
-from utils.mongodb import MongoDb
+from utils.database import SQLiteDb
 
 load_dotenv()
 
 ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
 ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED", "false").lower() == "true"
 
+db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
+db_helper = SQLiteDb(database_name=db_filename)
+database = db_helper.connect()
+
 adb = Adb(ADB_PATH)
 
 router = APIRouter(
     tags=["Android Debug Bridge"]
-)
-
-mongodb_helper = MongoDb(
-    database_name=os.getenv("MONGODB_DATABASE_NAME")
-)
-
-mongodb = mongodb_helper.connect(
-    host=os.getenv("MONGODB_HOST"),
-    port=int(os.getenv("MONGODB_PORT")),
-    username=os.getenv("MONGODB_USERNAME"),
-    password=os.getenv("MONGODB_PASSWORD")
 )
 
 
@@ -104,7 +97,7 @@ async def adb_send_text_message(
 
     messages_sent = 0
 
-    messages_sent = mongodb_helper.count_messages(account.username)
+    messages_sent = db_helper.count_messages(account.username)
 
     if not account.administrator:
 
@@ -135,7 +128,7 @@ async def adb_send_text_message(
                 expires_at=expires_next_month
             )
 
-            mongodb_helper.insert_message(message_payload)
+            db_helper.insert_message(message_payload)
 
             return AdbMessageSentResponse(
                 detail="Message has been successfully sent",

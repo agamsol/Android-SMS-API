@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from utils.adb import Adb  # noqa: F401
-from utils.mongodb import MongoDb
+from utils.database import SQLiteDb
 from routes import health, authentication, adb
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
@@ -16,16 +16,9 @@ load_dotenv()
 ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
 ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
 
-mongodb_helper = MongoDb(
-    database_name=os.getenv("MONGODB_DATABASE_NAME")
-)
-
-mongodb = mongodb_helper.connect(
-    host=os.getenv("MONGODB_HOST"),
-    port=int(os.getenv("MONGODB_PORT")),
-    username=os.getenv("MONGODB_USERNAME"),
-    password=os.getenv("MONGODB_PASSWORD")
-)
+db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
+db_helper = SQLiteDb(database_name=db_filename)
+database = db_helper.connect()
 
 
 @asynccontextmanager
@@ -181,4 +174,4 @@ app.include_router(
 
 if __name__ == "__main__":
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

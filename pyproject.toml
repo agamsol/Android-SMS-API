@@ -1,7 +1,7 @@
 [project]
-name = "0-1"
-version = "0.1.0"
-description = "Add your description here"
+name = "Android-SMS-API"
+version = "0.1"
+description = "Turn your Android phone into a programmable SMS server. A lightweight HTTP API wrapper around ADB for sending text messages over cellular network"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -10,7 +10,6 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "jwt>=1.4.0",
-    "pymongo>=4.15.5",
     "uvicorn>=0.38.0",
     "python-multipart>=0.0.21",
     "bcrypt==3.2.0",
