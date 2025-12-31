@@ -1,5 +1,6 @@
 import os
 import uvicorn
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
@@ -10,9 +11,11 @@ from utils.database import SQLiteDb
 from routes import health, authentication, adb
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
+from utils.adb_wireless import QRPrepare, AdbListener
 
 load_dotenv()
 
+ADB_QR_DEVICE_PAIRING = os.getenv("ADB_QR_DEVICE_PAIRING", "true").lower() == "true"
 ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
 ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
 
@@ -24,6 +27,8 @@ database = db_helper.connect()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
+    connection_failed = False
+
     if ADB_AUTO_CONNECT and ADB_DEFAULT_DEVICE:
 
         try:
@@ -31,16 +36,38 @@ async def lifespan(app: FastAPI):
 
             result = await adb_library.connect_device(ADB_DEFAULT_DEVICE)
 
-            response_detail = "ADB Error while connecting to device!"
-
             if "connected" in result.stdout or "already" in result.stdout:
 
                 response_detail = "ADB is now connected to device"
+
+            else:
+
+                response_detail = "ADB Error while connecting to device!"
+                connection_failed = True
 
             print(f"ADB Connection Status: {response_detail}")
 
         except Exception as e:
             print(f"Failed to auto-connect to ADB: {e}")
+
+    # if connection failed - new
+    # if connection is disabled and ADB_QR_DEVICE_PAIRING enablked
+
+    if (connection_failed and ADB_QR_DEVICE_PAIRING) or (not ADB_AUTO_CONNECT and ADB_QR_DEVICE_PAIRING):  # Pair new device
+
+        service_name, password, qr = QRPrepare.generate_qr_code()
+
+        qr.print_ascii(invert=True)
+
+        print("\nScan this QR code (Settings > Developer Options > Wireless Debugging):")
+
+        listener = AdbListener(service_name, password)
+
+        t = threading.Thread(
+            target=listener.listen_for_connection,
+            args=[180]
+        )
+        t.start()
 
     yield
 

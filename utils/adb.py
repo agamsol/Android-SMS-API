@@ -19,7 +19,6 @@ class Adb:
 
     def __init__(self, adb_path: str):
         self.adb_path: str = self.verify_adb_path(adb_path)
-        self.adb_port: int = 5555
 
     @staticmethod
     def verify_adb_path(adb_path=None):
@@ -86,11 +85,35 @@ class Adb:
 
         return devices
 
-    async def connect_device(self, device_address: IPvAnyAddress = None):
+    async def pair_device(self, address: IPvAnyAddress, port: int, password: str) -> bool:
 
-        await self.adb_execute(
-            ['tcpip', str(self.adb_port)]
-        )
+        full_address = str(address) + ":" + str(port)
+
+        try:
+
+            process = await self.adb_execute(
+                ['pair', full_address, password]
+            )
+
+        except subprocess.TimeoutExpired:
+
+            print("QR Device pairing failed due to a timeout!")
+
+        if process.returncode == 0 and "Successfully paired" in process.stdout:
+
+            await self.connect_device(address, disable_tcpip_command=True)
+
+            return True
+
+        return False
+
+    async def connect_device(self, device_address: IPvAnyAddress = None, adb_port: int = 5555, disable_tcpip_command=False):
+
+        if not disable_tcpip_command:
+
+            await self.adb_execute(
+                ['tcpip', str(adb_port)]
+            )
 
         process = await self.adb_execute(
             ['connect', str(device_address)]
