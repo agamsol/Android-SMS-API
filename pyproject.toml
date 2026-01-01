@@ -15,4 +15,5 @@ dependencies = [
     "bcrypt==3.2.0",
     "zeroconf>=0.148.0",
     "qrcode[pil]>=8.2",
+    "apscheduler>=3.11.2",
 ]

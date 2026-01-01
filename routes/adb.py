@@ -59,6 +59,33 @@ async def adb_kill_server(
 
 
 @router.post(
+    "/pair-device",
+    summary="Connect to an Android device over the network via TCP/IP",
+    status_code=status.HTTP_200_OK,
+    response_model=AdbConnectDeviceResponse
+)
+async def adb_pair_device(
+    account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+    body: AdbConnectDeviceRequest
+):
+
+    response_detail = "ADB Error while connecting to device!"
+
+    device = await adb.connect_device(body.device_id)
+
+    if "connected" in device.stdout or "already" in device.stdout:
+
+        response_detail = "ADB is now connected to device"
+
+    return AdbConnectDeviceResponse(
+        detail=response_detail,
+        device_id=body.device_id,
+        adb_output=device.stdout
+    )
+
+
+
+@router.post(
     "/connect-device",
     summary="Connect to an Android device over the network via TCP/IP",
     status_code=status.HTTP_200_OK,

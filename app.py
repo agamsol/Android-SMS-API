@@ -1,4 +1,5 @@
 import os
+import time
 import uvicorn
 import threading
 from contextlib import asynccontextmanager
@@ -12,7 +13,8 @@ from routes import health, authentication, adb
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
 from utils.adb_wireless import QRPrepare, AdbListener
-
+from apscheduler.schedulers.background import BackgroundScheduler
+from utils.scheduler import monthly_message_reset
 load_dotenv()
 
 ADB_QR_DEVICE_PAIRING = os.getenv("ADB_QR_DEVICE_PAIRING", "true").lower() == "true"
@@ -26,6 +28,10 @@ database = db_helper.connect()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(monthly_message_reset, 'cron', hour=0, minute=0)
+    scheduler.start()
 
     connection_failed = False
 

@@ -67,6 +67,15 @@ class SQLiteDb:
 
         return self.conn
 
+    def reset_all_messages(self):
+
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM messages")
+
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
+
+        self.conn.commit()
+
     def get_user(self, username: str):
 
         cursor = self.conn.cursor()
