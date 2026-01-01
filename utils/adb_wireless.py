@@ -1,10 +1,12 @@
 import os
+import io
 import time
 import random
 import string
 import socket
 import asyncio
 import threading
+import subprocess
 from qrcode import QRCode
 from zeroconf import ServiceBrowser, Zeroconf
 from utils.adb import Adb
@@ -50,6 +52,28 @@ class AdbListener:
         self.password = password
         self.shutdown_event = threading.Event()
 
+    def pair_device_successful(self, address, port, password) -> bool:
+
+        process: subprocess.CompletedProcess = asyncio.run(
+            adb.pair_device(address, port, password)
+        )
+
+        if process.returncode == 0 and "Successfully paired" in process.stdout:
+            return True
+
+        return False
+
+    def connect_device_successful(self, address) -> bool:
+
+        process: subprocess.CompletedProcess = asyncio.run(
+            adb.connect_device(address, disable_tcpip_command=False)
+        )
+
+        if "connected" in process.stdout or "already" in process.stdout:
+            return True
+
+        return False
+
     def update_service(self, zeroconf: Zeroconf, type, name):
         pass
 
@@ -66,13 +90,9 @@ class AdbListener:
 
                 address = socket.inet_ntoa(info.addresses[0])
 
-                success = asyncio.run(
-                    adb.pair_device(address, info.port, self.password)
-                )
+                if self.pair_device_successful(address, info.port, self.password):
 
-                if success:
-
-                    print("ADB Connection Status: ADB is now connected to device")
+                    self.connect_device_successful(address)
 
                     self.shutdown_event.set()
 
@@ -104,18 +124,42 @@ class AdbListener:
             zeroconf.close()
 
 
-if __name__ == "__main__":
-
-    # Example
+def start_terminal_pairing_session(timeout=180):
 
     service_name, password, qr = QRPrepare.generate_qr_code()
+
     qr.print_ascii(invert=True)
+
+    print("\nScan this QR code (Settings > Developer Options > Wireless Debugging):")
 
     listener = AdbListener(service_name, password)
 
     t = threading.Thread(
         target=listener.listen_for_connection,
-        args=[180]
+        args=[timeout],
+        daemon=True
     )
+    t.start()
 
-    time.sleep(10000000)
+    return listener
+
+
+def start_image_pairing_session(timeout=180):
+
+    service_name, password, qr = QRPrepare.generate_qr_code()
+
+    image = qr.make_image(fill_color="black", back_color="white")
+    image_bytes = io.BytesIO()
+    image.save(image_bytes, format='PNG')
+    image_bytes.seek(0)
+
+    listener = AdbListener(service_name, password)
+
+    t = threading.Thread(
+        target=listener.listen_for_connection,
+        args=[timeout],
+        daemon=True
+    )
+    t.start()
+
+    return listener, image_bytes

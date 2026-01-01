@@ -10,6 +10,20 @@ load_dotenv()
 
 ADB_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_SHELL_EXECUTION_ROUTE_ENABLED", "true").lower() == "true"
 
+ADB_PAIRING_INSTRUCTIONS = """
+**Step-by-step instructions:**
+
+1. Go to **Settings** > **Developer Options**.
+2. Tap **Wireless Debugging**
+3. Select 'Pair device with QR code'.
+4. Execute this endpoint to generate a QR code and scan it with your device.
+5. Confirm the device has been paired successfully by calling the **GET** `/adb/list-devices` endpoint.
+
+_Note: Ensure your device is on the same Wi-Fi network._
+
+__The QR code will be valid for 5 minutes__
+"""
+
 
 def execution_route_enabled():
 

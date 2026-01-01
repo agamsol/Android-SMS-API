@@ -1,14 +1,16 @@
 import os
 import time
-from dotenv import load_dotenv
-from datetime import datetime, timezone, timedelta
 from typing import Annotated
-from fastapi import Depends, HTTPException, status, APIRouter
-from utils.models.database import Message_Model
-from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
-from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, execution_route_enabled
-from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
+from dotenv import load_dotenv
 from utils.database import SQLiteDb
+from fastapi.responses import StreamingResponse
+from utils.models.database import Message_Model
+from datetime import datetime, timezone, timedelta
+from utils.adb_wireless import start_image_pairing_session
+from fastapi import Depends, HTTPException, status, APIRouter
+from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
+from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
+from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, execution_route_enabled, ADB_PAIRING_INSTRUCTIONS
 
 load_dotenv()
 
@@ -36,9 +38,37 @@ async def adb_list_devices(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
 ):
 
+    if not account.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
     devices_list = await adb.get_devices()
 
     return devices_list
+
+
+@router.get(
+    "/pair-device",
+    summary="Pairing a new Android device over the network via QR code",
+    status_code=status.HTTP_200_OK,
+    response_class=StreamingResponse,
+    description=ADB_PAIRING_INSTRUCTIONS,
+    responses={
+        200: {
+            "content": {"image/png": {}},
+            "description": "QR Code for device pairing"
+        }
+    }
+)
+async def adb_pair_device(
+    account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+) -> StreamingResponse:
+
+    if not account.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    listener, image_bytes = start_image_pairing_session(timeout=300)
+
+    return StreamingResponse(image_bytes, media_type="image/png")
 
 
 @router.post(
@@ -51,38 +81,14 @@ async def adb_kill_server(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
 ):
 
+    if not account.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
     await adb.kill_server()
 
     return AdbDetailResponse(
         detail="ADB server has been terminated"
     )
-
-
-@router.post(
-    "/pair-device",
-    summary="Connect to an Android device over the network via TCP/IP",
-    status_code=status.HTTP_200_OK,
-    response_model=AdbConnectDeviceResponse
-)
-async def adb_pair_device(
-    account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    body: AdbConnectDeviceRequest
-):
-
-    response_detail = "ADB Error while connecting to device!"
-
-    device = await adb.connect_device(body.device_id)
-
-    if "connected" in device.stdout or "already" in device.stdout:
-
-        response_detail = "ADB is now connected to device"
-
-    return AdbConnectDeviceResponse(
-        detail=response_detail,
-        device_id=body.device_id,
-        adb_output=device.stdout
-    )
-
 
 
 @router.post(
@@ -95,6 +101,9 @@ async def adb_connect_device(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
     body: AdbConnectDeviceRequest
 ):
+
+    if not account.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
 
     response_detail = "ADB Error while connecting to device!"
 

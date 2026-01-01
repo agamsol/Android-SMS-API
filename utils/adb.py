@@ -95,17 +95,13 @@ class Adb:
                 ['pair', full_address, password]
             )
 
+            return process
+
         except subprocess.TimeoutExpired:
 
             print("QR Device pairing failed due to a timeout!")
 
-        if process.returncode == 0 and "Successfully paired" in process.stdout:
-
-            await self.connect_device(address, disable_tcpip_command=True)
-
-            return True
-
-        return False
+        return
 
     async def connect_device(self, device_address: IPvAnyAddress = None, adb_port: int = 5555, disable_tcpip_command=False):
 

@@ -1,19 +1,16 @@
 import os
-import time
 import uvicorn
-import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
-from utils.adb import Adb  # noqa: F401
 from utils.database import SQLiteDb
 from routes import health, authentication, adb
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
-from utils.adb_wireless import QRPrepare, AdbListener
 from apscheduler.schedulers.background import BackgroundScheduler
+from utils.adb_wireless import start_terminal_pairing_session
 from utils.scheduler import monthly_message_reset
 load_dotenv()
 
@@ -56,24 +53,9 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Failed to auto-connect to ADB: {e}")
 
-    # if connection failed - new
-    # if connection is disabled and ADB_QR_DEVICE_PAIRING enablked
+    if (connection_failed and ADB_QR_DEVICE_PAIRING) or (not ADB_AUTO_CONNECT and ADB_QR_DEVICE_PAIRING):
 
-    if (connection_failed and ADB_QR_DEVICE_PAIRING) or (not ADB_AUTO_CONNECT and ADB_QR_DEVICE_PAIRING):  # Pair new device
-
-        service_name, password, qr = QRPrepare.generate_qr_code()
-
-        qr.print_ascii(invert=True)
-
-        print("\nScan this QR code (Settings > Developer Options > Wireless Debugging):")
-
-        listener = AdbListener(service_name, password)
-
-        t = threading.Thread(
-            target=listener.listen_for_connection,
-            args=[180]
-        )
-        t.start()
+        start_terminal_pairing_session()
 
     yield
 

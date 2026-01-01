@@ -116,7 +116,7 @@ async def login_for_access_token(
 
 
 @router.post(
-    "/administrator/create-account",
+    "/create-account",
     summary="Create an account with a monthly limitted messages cap",
     response_model=AdditionalAccountData,
     status_code=status.HTTP_201_CREATED,
@@ -164,7 +164,7 @@ async def create_account(
 
 
 @router.put(
-    "/administrator/reset-password",
+    "/reset-password",
     summary="Reset password for a specific account. Users can reset their own password without administrator privileges.",
     response_model=AccountConfirmationResponse,
     status_code=status.HTTP_200_OK,
@@ -213,7 +213,7 @@ async def reset_account_password(
 
 
 @router.put(
-    "/administrator/message-limit",
+    "/message-limit",
     summary="Update monthly message limit for a user",
     response_model=MessageLimitUpdateResponse,
     status_code=status.HTTP_200_OK,
@@ -258,7 +258,7 @@ async def update_message_limit(
 
 
 @router.delete(
-    "/administrator/delete-account",
+    "/delete-account",
     summary="",
     response_model=AccountConfirmationResponse,
     status_code=status.HTTP_200_OK,

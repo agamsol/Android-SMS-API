@@ -4,8 +4,8 @@ Turn your Android phone into an SMS server. A lightweight HTTP API wrapper aroun
 # TODO:
 - ✅ QR Device Pair
 - ✅ Monthly message table reset (sqlite3)
-- adb_wireless.py better log messages
-- Pairing device route
+- ✅ Pairing device route
+- *adb_wireless.py better log messages
 - Easy docker deployment
 - International Phone Regexes / Config Selection (Only Israel Supported ATM)
 - More models support (Older device support)
