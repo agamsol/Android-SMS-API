@@ -1,16 +1,30 @@
 import sqlite3
+from pathlib import Path
+from utils.logger import create_logger
 from utils.models.database import User_Model, Message_Model
+
+log = create_logger("DATABASE", logger_name="ASA_DATABASE")
 
 
 class SQLiteDb:
 
-    def __init__(self, database_name: str):
+    def __init__(self, database_path: str):
 
-        self.database_name: str = database_name if database_name.endswith(".db") else f"{database_name}.db"
+        self.database_name = self._validate_database_path(database_path)
         self.conn: sqlite3.Connection = None
-
         self.messages_table_name = "messages"
         self.users_table_name = "users"
+
+    def _validate_database_path(self, database_path: str) -> str:
+
+        path = Path(database_path)
+
+        if path.suffix != ".db":
+            path = path.with_suffix(".db")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        return str(path)
 
     def _dict_factory(self, cursor, row):
         """
@@ -48,15 +62,13 @@ class SQLiteDb:
         """)
         self.conn.commit()
 
-    def connect(
-        self,
-        force_database_name: str = None,
-        server_selection_timeout: int = 10000
-    ):
+    def connect(self, force_database_name: str = None):
+
         if force_database_name:
             self.database_name = force_database_name
 
         if not self.database_name:
+            log.error("Connection failed: No database path specified.")
             raise ValueError("No database was specified during the connection.")
 
         self.conn = sqlite3.connect(self.database_name, check_same_thread=False)
@@ -69,15 +81,18 @@ class SQLiteDb:
 
     def reset_all_messages(self):
 
+        log.warning("Initiating full reset of message history.")
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM messages")
 
         cursor.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
 
         self.conn.commit()
+        log.info("All messages have been wiped from the database.")
 
     def get_user(self, username: str):
 
+        log.debug(f"Fetching profile for user: {username}")
         cursor = self.conn.cursor()
         cursor.execute(
             f"SELECT * FROM {self.users_table_name} WHERE username = ?",
@@ -85,6 +100,9 @@ class SQLiteDb:
         )
 
         query = cursor.fetchone()
+
+        if not query:
+            log.debug(f"User lookup failed - User not found: {username}")
 
         return query
 
@@ -94,6 +112,7 @@ class SQLiteDb:
         cursor = self.conn.cursor()
 
         try:
+            log.info(f"Attempting to register new user: {user_model.username}")
             cursor.execute(
                 f"""INSERT INTO {self.users_table_name}
                    (username, hashed_password, messages_limit, administrator)
@@ -101,14 +120,17 @@ class SQLiteDb:
                 data
             )
             self.conn.commit()
+            log.info(f"User registration successful: {user_model.username}")
 
             return
 
         except sqlite3.IntegrityError:
+            log.warning(f"Registration failed - Username already exists: {user_model.username}")
             return None
 
     def change_password(self, username: str, new_password: str):
 
+        log.info(f"Attempting password change for: {username}")
         current_user = self.get_user(username)
 
         if current_user:
@@ -118,11 +140,15 @@ class SQLiteDb:
                 (new_password, username)
             )
             self.conn.commit()
+            log.info(f"Password updated successfully for: {username}")
+        else:
+            log.warning(f"Password update failed - User not found: {username}")
 
         return current_user
 
     def update_message_limit(self, username: str, messages_limit: int):
 
+        log.info(f"Updating message limit for {username} to {messages_limit}")
         current_user = self.get_user(username)
 
         if current_user:
@@ -133,11 +159,15 @@ class SQLiteDb:
                 (messages_limit, username)
             )
             self.conn.commit()
+            log.info(f"Message limit updated for {username}.")
+        else:
+            log.warning(f"Message limit update failed - User not found: {username}")
 
         return current_user
 
     def delete_account(self, username: str):
 
+        log.warning(f"Request received to delete account: {username}")
         current_user = self.get_user(username)
 
         if current_user:
@@ -147,6 +177,9 @@ class SQLiteDb:
                 (username,)
             )
             self.conn.commit()
+            log.critical(f"Account permanently deleted: {username}")
+        else:
+            log.warning(f"Account deletion failed - User not found: {username}")
 
         return current_user
 
@@ -160,11 +193,16 @@ class SQLiteDb:
         )
 
         result = cursor.fetchone()
+        count = result['count'] if result else 0
 
-        return result['count'] if result else 0
+        log.debug(f"Message count for {username}: {count}")
+        return count
 
     def insert_message(self, message_model: Message_Model) -> None:
         data = message_model.model_dump(mode="json")
+
+        log.debug(f"Inserting message. User: {message_model.username}, To: {message_model.sent_to}, Expires: {message_model.expires_at}")
+
         cursor = self.conn.cursor()
 
         cursor.execute(

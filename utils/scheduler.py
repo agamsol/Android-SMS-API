@@ -1,16 +1,18 @@
 import os
 from datetime import datetime
 from calendar import monthrange
-from utils.database import SQLiteDb
 from dotenv import load_dotenv
+from utils.database import SQLiteDb
+from utils.logger import create_logger
 
 load_dotenv()
 
 PLAN_RESET_DAY_OF_MONTH = int(os.getenv("PLAN_RESET_DAY_OF_MONTH", "0"))
-
-db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
-db_helper = SQLiteDb(database_name=db_filename)
+DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
+db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
+
+log = create_logger("SCHEDULER", logger_name="ASA_SCHEDULER")
 
 
 def should_run_today(day: int) -> bool:
@@ -30,6 +32,7 @@ def should_run_today(day: int) -> bool:
 def monthly_message_reset():
 
     if should_run_today(PLAN_RESET_DAY_OF_MONTH):
+        log.critical(f"Initiating global monthly message count reset. Configured Reset Day: {PLAN_RESET_DAY_OF_MONTH}")
         db_helper.reset_all_messages()
 
         return True

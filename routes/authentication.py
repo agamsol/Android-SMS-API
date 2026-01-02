@@ -13,8 +13,8 @@ load_dotenv()
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
-db_helper = SQLiteDb(database_name=db_filename)
+DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
+db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")

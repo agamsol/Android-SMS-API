@@ -9,6 +9,7 @@ from utils.database import SQLiteDb
 from routes import health, authentication, adb
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
+from utils.logger import create_logger
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.adb_wireless import start_terminal_pairing_session
 from utils.scheduler import monthly_message_reset
@@ -17,45 +18,45 @@ load_dotenv()
 ADB_QR_DEVICE_PAIRING = os.getenv("ADB_QR_DEVICE_PAIRING", "true").lower() == "true"
 ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
 ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
+PLAN_RESET_DAY_OF_MONTH = int(os.getenv("PLAN_RESET_DAY_OF_MONTH", "0"))
+DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
 
-db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
-db_helper = SQLiteDb(database_name=db_filename)
+db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
+
+log = create_logger(alias="APP", logger_name="ASA_APP")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(monthly_message_reset, 'cron', hour=0, minute=0)
-    scheduler.start()
+    log.info("Application startup: Initializing background services.")
+
+    if PLAN_RESET_DAY_OF_MONTH != 0:
+
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(monthly_message_reset, 'cron', hour=0, minute=0)
+        scheduler.start()
+
+        log.info("Background scheduler started. Monthly reset job scheduled.")
 
     connection_failed = False
 
     if ADB_AUTO_CONNECT and ADB_DEFAULT_DEVICE:
 
+        log.info(f"ADB Auto-Connect enabled. Attempting to connect to default device: {ADB_DEFAULT_DEVICE}")
         try:
-            print(f"Auto-connecting to {ADB_DEFAULT_DEVICE}...")
-
-            result = await adb_library.connect_device(ADB_DEFAULT_DEVICE)
-
-            if "connected" in result.stdout or "already" in result.stdout:
-
-                response_detail = "ADB is now connected to device"
-
-            else:
-
-                response_detail = "ADB Error while connecting to device!"
-                connection_failed = True
-
-            print(f"ADB Connection Status: {response_detail}")
-
+            await adb_library.connect_device(ADB_DEFAULT_DEVICE)
         except Exception as e:
-            print(f"Failed to auto-connect to ADB: {e}")
+            log.error(f"Auto-connect failed: {str(e)}")
+            connection_failed = True
 
     if (connection_failed and ADB_QR_DEVICE_PAIRING) or (not ADB_AUTO_CONNECT and ADB_QR_DEVICE_PAIRING):
 
-        start_terminal_pairing_session()
+        log.debug("Starting terminal-based QR pairing session as per configuration.")
+        start_terminal_pairing_session(300)
+
+    log.debug("Application startup complete. API is ready to accept requests.")
 
     yield
 
@@ -137,6 +138,9 @@ app = FastAPI(
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Global handler for HTTP exceptions"""
+
+    log.warning(f"HTTP Exception encountered. Status: {exc.status_code}, Detail: {exc.detail}, Path: {request.url.path}")
+
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -150,6 +154,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Global handler for validation errors"""
+
+    log.warning(f"Request validation failed. Path: {request.url.path}, Errors: {str(exc.errors())}")
+
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={
@@ -189,4 +196,5 @@ app.include_router(
 
 if __name__ == "__main__":
 
+    log.info("Starting Uvicorn server environment...")
     uvicorn.run(app, host="0.0.0.0", port=8001)

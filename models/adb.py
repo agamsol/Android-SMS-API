@@ -11,17 +11,20 @@ load_dotenv()
 ADB_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_SHELL_EXECUTION_ROUTE_ENABLED", "true").lower() == "true"
 
 ADB_PAIRING_INSTRUCTIONS = """
+### Wireless ADB Pairing Setup (Using QR-Code)
+
+_Notes:_
+1. Ensure your device is on the same Wi-Fi network.
+2. Enable **Developer Options** (Settings > About Phone > Tap 'Build Number' 7 times).
+
 **Step-by-step instructions:**
-
 1. Go to **Settings** > **Developer Options**.
-2. Tap **Wireless Debugging**
-3. Select 'Pair device with QR code'.
-4. Execute this endpoint to generate a QR code and scan it with your device.
-5. Confirm the device has been paired successfully by calling the **GET** `/adb/list-devices` endpoint.
+2. Enable **Wireless debugging** and tap the text to open the menu.
+3. Tap **Pair device with QR code**.
+4. Execute this endpoint to generate the QR code, then scan it.
+5. Confirm successful pairing by checking this terminal's logs or calling the **GET** `/adb/list-devices` endpoint.
 
-_Note: Ensure your device is on the same Wi-Fi network._
-
-__The QR code will be valid for 5 minutes__
+__The QR code is valid for 5 minutes__
 """
 
 

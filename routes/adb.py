@@ -17,8 +17,8 @@ load_dotenv()
 ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
 ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED", "false").lower() == "true"
 
-db_filename = os.getenv("SQLITE_DATABASE_NAME", "Android-SMS-API")
-db_helper = SQLiteDb(database_name=db_filename)
+DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
+db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
 
 adb = Adb(ADB_PATH)

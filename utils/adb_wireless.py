@@ -8,11 +8,16 @@ import asyncio
 import threading
 import subprocess
 from qrcode import QRCode
-from zeroconf import ServiceBrowser, Zeroconf
 from utils.adb import Adb
+from utils.logger import create_logger
+from zeroconf import ServiceBrowser, Zeroconf
+
+from models.adb import ADB_PAIRING_INSTRUCTIONS
 
 ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
 adb = Adb(ADB_PATH)
+
+log = create_logger("ADB-WIRELESS", logger_name="ASA_ADB_WIRELESS")
 
 
 class QRPrepare:
@@ -98,6 +103,7 @@ class AdbListener:
 
     def listen_for_connection(self, timeout=180):
 
+        log.debug(f"Starting mDNS listener for ADB TLS pairing. Timeout set to {timeout}s.")
         zeroconf = Zeroconf()
 
         ServiceBrowser(zeroconf, "_adb-tls-pairing._tcp.local.", self)
@@ -109,28 +115,33 @@ class AdbListener:
             while not self.shutdown_event.is_set():
 
                 if time.time() - start_time > timeout:
-
-                    print(f"[QR] Pairing session timed out ({timeout}s). The QR code is no longer valid.")
-
+                    log.warning(f"Pairing session timed out ({timeout}s). The QR code is no longer valid.")
                     break
 
                 time.sleep(0.5)
 
         except KeyboardInterrupt:
-            pass
+
+            log.info("Pairing listener interrupted manually.")
 
         finally:
 
+            log.debug("Shutting down mDNS listener.")
             zeroconf.close()
 
 
 def start_terminal_pairing_session(timeout=180):
 
+    log.info(f"Initiating terminal-based QR pairing session. Timeout: {timeout}s")
     service_name, password, qr = QRPrepare.generate_qr_code()
+
+    log.debug(f"QR credentials generated for service: {service_name}")
 
     qr.print_ascii(invert=True)
 
-    print("\nScan this QR code (Settings > Developer Options > Wireless Debugging):")
+    plain_text_pairing_instructions = ((ADB_PAIRING_INSTRUCTIONS.replace("*", "")).replace("_", "")).replace("#", "")  # I never chain like this but its ok lol (forbidden: *_#)
+
+    log.info(plain_text_pairing_instructions)
 
     listener = AdbListener(service_name, password)
 
@@ -140,18 +151,24 @@ def start_terminal_pairing_session(timeout=180):
         daemon=True
     )
     t.start()
+    log.debug("Pairing listener thread started in background.")
 
     return listener
 
 
 def start_image_pairing_session(timeout=180):
 
+    log.info(f"Initiating image-based QR pairing session. Timeout: {timeout}s")
     service_name, password, qr = QRPrepare.generate_qr_code()
+
+    log.debug(f"QR credentials generated for service: {service_name}")
 
     image = qr.make_image(fill_color="black", back_color="white")
     image_bytes = io.BytesIO()
     image.save(image_bytes, format='PNG')
     image_bytes.seek(0)
+
+    log.debug("QR code image rendered to memory buffer.")
 
     listener = AdbListener(service_name, password)
 
@@ -161,5 +178,6 @@ def start_image_pairing_session(timeout=180):
         daemon=True
     )
     t.start()
+    log.debug("Pairing listener thread started in background.")
 
     return listener, image_bytes
