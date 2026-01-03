@@ -1,4 +1,6 @@
 import re
+import string
+import random
 from typing import Annotated, Literal, Optional
 from fastapi import Form, HTTPException, status
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -7,6 +9,14 @@ MUST_BE_ADMINISTRATOR_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="You are not authorized perform this action!"
 )
+
+def generate_random_password(length=10):
+
+    custom_specials = "!#$%^&*()[];:<>=-?@_+|{}~"
+
+    characters = string.ascii_letters + string.digits + custom_specials
+    password = ''.join(random.choice(characters) for _ in range(length))
+    return password
 
 
 class BaseUser(BaseModel):

@@ -7,6 +7,6 @@ Turn your Android phone into an SMS server. A lightweight HTTP API wrapper aroun
 - ✅ Pairing device route
 - ✅ Sqlite3 database path regulator
 - ✅ *adb_wireless.py better log messages
+- ✅ International Phone Regex
 - Easy docker deployment
-- International Phone Regexes / Config Selection (Only Israel Supported ATM)
 - More models support (Older device support)

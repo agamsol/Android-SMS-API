@@ -71,7 +71,7 @@ class AdbListener:
     def connect_device_successful(self, address) -> bool:
 
         process: subprocess.CompletedProcess = asyncio.run(
-            adb.connect_device(address, disable_tcpip_command=False)
+            adb.connect_device(address, disable_tcpip_command=True)
         )
 
         if "connected" in process.stdout or "already" in process.stdout:

@@ -56,8 +56,7 @@ class SQLiteDb:
                 username TEXT NOT NULL,
                 message TEXT,
                 sent_to TEXT NOT NULL,
-                sent_time INTEGER NOT NULL,
-                expires_at TEXT NOT NULL
+                sent_time INTEGER NOT NULL
             )
         """)
         self.conn.commit()
@@ -201,14 +200,14 @@ class SQLiteDb:
     def insert_message(self, message_model: Message_Model) -> None:
         data = message_model.model_dump(mode="json")
 
-        log.debug(f"Inserting message. User: {message_model.username}, To: {message_model.sent_to}, Expires: {message_model.expires_at}")
+        log.debug(f"Inserting message. User: {message_model.username}, To: {message_model.sent_to}")
 
         cursor = self.conn.cursor()
 
         cursor.execute(
             f"""INSERT INTO {self.messages_table_name}
-               (username, message, sent_to, sent_time, expires_at)
-               VALUES (:username, :message, :sent_to, :sent_time, :expires_at)""",
+               (username, message, sent_to, sent_time)
+               VALUES (:username, :message, :sent_to, :sent_time)""",
             data
         )
         self.conn.commit()

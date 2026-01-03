@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import subprocess
 from typing import Optional
 from pydantic import IPvAnyAddress
@@ -51,7 +52,8 @@ class Adb:
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=timeout
+                timeout=timeout,
+                errors="replace"
             )
 
             if process.returncode != 0:
@@ -190,6 +192,9 @@ class Adb:
             raise DeviceConnectionError("No Authorized android device found. Please connect via USB or TCP")
 
         log.debug(f"Sending SMS via device: {device_name}")
+
+        escaped_message = shlex.quote(message)
+
         adb_command = [
             "-s", str(device_name),
             "shell", "service", "call", "isms", "5",
@@ -198,7 +203,7 @@ class Adb:
             "s16", "null",
             "s16", phone_number,
             "s16", "null",
-            f's16 "{message}"',
+            "s16", escaped_message,
             "s16", "null",
             "s16", "null",
             "i32", "0",

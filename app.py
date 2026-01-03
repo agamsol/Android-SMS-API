@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from utils.database import SQLiteDb
 from routes import health, authentication, adb
+from routes.authentication import ADMIN_USERNAME, ADMIN_PASSWORD
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
 from utils.logger import create_logger
@@ -56,8 +57,7 @@ async def lifespan(app: FastAPI):
         log.debug("Starting terminal-based QR pairing session as per configuration.")
         start_terminal_pairing_session(300)
 
-    log.debug("Application startup complete. API is ready to accept requests.")
-
+    log.info(f"Admin Credentials: Username='{ADMIN_USERNAME}' Password='{ADMIN_PASSWORD}'")
     yield
 
 

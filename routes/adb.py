@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from utils.database import SQLiteDb
 from fastapi.responses import StreamingResponse
 from utils.models.database import Message_Model
-from datetime import datetime, timezone, timedelta
 from utils.adb_wireless import start_image_pairing_session
 from fastapi import Depends, HTTPException, status, APIRouter
 from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
@@ -154,14 +153,11 @@ async def adb_send_text_message(
 
         if parcel_sent:
 
-            expires_next_month = datetime.now(timezone.utc) + timedelta(days=30)
-
             message_payload = Message_Model(
                 username=account.username,
                 message=body.message,
                 sent_to=body.phone_number,
                 sent_time=int(time.time()),
-                expires_at=expires_next_month
             )
 
             db_helper.insert_message(message_payload)

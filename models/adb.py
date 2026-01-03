@@ -72,13 +72,13 @@ class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
     adb_output: str = Field(..., max_length=99)
 
 
+## Example for possible regexes (future update)
+# pattern=r"^(972|0)5[023458]\d{7}$",
+# description="Must start with 05x (10 digits) or 9725x (12 digits). Allowed providers: 0,2,3,4,5,8."
+
 class AdbSendTextMessageRequest(BaseModel):
     device_id: Optional[str] = Field(None, min_length=4, max_length=35, description="The unique identifier (serial) of the Android device. If omitted, a random available device will be selected.", examples=[None])
-    phone_number: str = Field(
-        ...,
-        pattern=r"^(972|0)5[023458]\d{7}$",
-        description="Must start with 05x (10 digits) or 9725x (12 digits). Allowed providers: 0,2,3,4,5,8."
-    )
+    phone_number: str = Field(..., pattern=r"^\+[1-9]\d{1,14}$")
     message: str
 
 

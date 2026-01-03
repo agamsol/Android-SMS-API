@@ -1,17 +1,27 @@
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer
-from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse
+from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse, generate_random_password
 from utils.models.database import User_Model
 from utils.database import SQLiteDb
 from utils.secure import JWToken, Hash
 
 load_dotenv()
 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+
+if not ADMIN_PASSWORD:
+
+    ADMIN_PASSWORD = generate_random_password()
+
+    set_key(
+        dotenv_path=".env",
+        key_to_set="ADMIN_PASSWORD",
+        value_to_set=ADMIN_PASSWORD
+    )
 
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
 db_helper = SQLiteDb(database_path=DATABASE_PATH)
