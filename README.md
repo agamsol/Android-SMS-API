@@ -1,4 +1,4 @@
-# Android SMS API Gateway 0.1 (Pre-release)
+# Android SMS API Gateway 0.1 *(No image yet)* 
 ![Version](https://img.shields.io/badge/Version-0.1_(Pre--Release)-orange)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Powered-009688?logo=fastapi&logoColor=white)
@@ -12,6 +12,9 @@ This application transforms any Android device into a dedicated, self-hosted **S
 - [Features & Capabilities](#features--capabilities)
 - [System Architecture](#system-architecture)
   - [The User Concept](#the-user-concept)
+- [Deployment](#deployment)
+  - [Docker](#docker)
+  - [Docker Compose](#docker-compose)
 - [Environment Configuration](#environment-configuration)
 - [User Management System](#user-management-system)
   - [The Hardcoded Administrator](#the-hardcoded-administrator)
@@ -23,9 +26,9 @@ This application transforms any Android device into a dedicated, self-hosted **S
     - [Enabling Developer Options](#enabling-developer-options)
     - [Essential Settings](#essential-settings)
   - [Wireless ADB Pairing (QR-Code)](#wireless-adb-pairing-qr-code)
-    - [1. Trigger the QR Code](#1-trigger-the-qr-code)
-    - [2. Pairing Instructions](#2-pairing-instructions)
-    - [3. Verification](#3-verification)
+    - [Trigger the QR Code](#trigger-the-qr-code)
+    - [Pairing Instructions](#pairing-instructions)
+    - [Verify Connection](#verify-connection)
 
 ---
 
@@ -45,11 +48,15 @@ This application transforms any Android device into a dedicated, self-hosted **S
 ## System Architecture
 
 ### The "User" Concept
-In this API, a "Standard User" is not limited to a human operator. A user entity functions effectively as a **Service Account** or **API Key**. 
+In this API, a "Standard User" is not limited to a human operator. A user entity functions effectively as a **Service Account** or **API Key**.
 * **Example Use Case**: You can create a user named `alert-system` with a 500-message limit and a separate user named `marketing-bot` with a 5,000-message limit. 
 * This allows multiple external applications to share the same physical Android hardware while maintaining isolated quotas and credentials.
 
 ---
+## Deployment
+
+The application is available as a Docker image. For data persistence (logs and database), you **must** mount the `/data` volume.
+
 ## Deployment
 
 The application is available as a Docker image. For data persistence (logs and database), you **must** mount the `/data` volume.
@@ -64,6 +71,27 @@ docker run -d \
   -v $(pwd)/data:/app/data \
   -e JWT_SECRET=<YOUR_SECURE_SECRET> \
   agamsol/android-sms-api:0.1
+```
+
+### Docker Compose
+For a more permanent setup, use Docker Compose. Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  android-sms-api:
+    image: agamsol/android-sms-api:0.1
+    container_name: android-sms-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - JWT_SECRET=<YOUR_SECURE_SECRET>
+      - ADMIN_USERNAME=admin
+      - PLAN_RESET_DAY_OF_MONTH=23
+      - ADB_QR_DEVICE_PAIRING=True
+      # Add other environment variables from the configuration table as needed
 ```
 
 ---
@@ -145,20 +173,23 @@ The Android device must be connected to a power source **24/7** to ensure uninte
 
 If `ADB_QR_DEVICE_PAIRING` is set to `True`, the server allows for wireless pairing via QR code. This can be triggered automatically on startup or manually via the API.
 
-#### 1. Trigger the QR Code
+#### Trigger the QR Code
 You can generate the pairing code in two ways:
 * **Automatic Prompt:** On server startup, if `ADB_AUTO_CONNECT` is disabled (or if the auto-connection fails), the server will automatically generate and display a pairing QR code in the terminal.
 * **Manual Trigger:** You can generate a new QR code at any time by calling the **GET** `/adb/pair-device` endpoint.
 
-#### 2. Pairing Instructions
+> **Note:** The generated QR code is valid for **5 minutes** before it expires.
+
+#### Pairing Instructions
+
 Once the QR code is displayed:
 1.  Navigate to **Settings** > **Developer Options** on your Android device.
 2.  Enable **Wireless debugging**.
 3.  Tap the **text** "Wireless debugging" (not the toggle) to enter the sub-menu.
 4.  Tap **Pair device with QR code**.
-5.  Scan the QR code displayed in your terminal or browser.
+5.  Scan the QR code displayed in your terminal or browser
 
-#### 3. Verification
+#### Verify Connection
 After scanning, the pairing process completes automatically. You can confirm success by:
 * Checking the terminal logs for a "Successfully Paired" message.
 * Calling the `GET /adb/list-devices` endpoint to verify your device appears with the status `authorized`.
