@@ -1,0 +1,15 @@
+services:
+  android-sms-api:
+    image: agamsol/android-sms-api:latest
+    container_name: android-sms-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ADMIN_USERNAME=admin
+      - PLAN_RESET_DAY_OF_MONTH=23
+      - ADB_QR_DEVICE_PAIRING=True
+      - ADB_AUTO_CONNECT=False
+      - ADB_DEFAULT_DEVICE=

@@ -72,7 +72,7 @@ class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
     adb_output: str = Field(..., max_length=99)
 
 
-## Example for possible regexes (future update)
+# Example for possible regexes (future update)
 # pattern=r"^(972|0)5[023458]\d{7}$",
 # description="Must start with 05x (10 digits) or 9725x (12 digits). Allowed providers: 0,2,3,4,5,8."
 

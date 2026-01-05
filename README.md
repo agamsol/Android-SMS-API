@@ -41,7 +41,7 @@ This application transforms any Android device into a dedicated, self-hosted **S
 * **Remote Shell Execution**: Administrators can execute raw `ADB SHELL` commands directly on the device for advanced debugging or automation.
 * **Simple Authentication**: Secure access via JWT-based tokens.
 
-> **Note on Message Content:** Currently, the send-message endpoint supports **ASCII/Plain text only**. Emoji support is in development and is not supported in version 0.1.
+> **Note on Message Content:** Currently, the send-message endpoint supports **ASCII/Plain text only**. Emoji support is in development and is not supported (YET).
 
 ---
 
@@ -59,37 +59,103 @@ In this API, a "Standard User" is not limited to a human operator. A user entity
 The application is available as a Docker image. For data persistence (logs and database), you **must** mount the `/data` volume.
 
 ### Docker
-Run the container using the command below. Make sure to replace `<YOUR_SECURE_SECRET>` with a strong string.
+Run the container directly using Docker. This method is useful for quick setups, testing, or when you don’t need Docker Compose.
+
+> **Important:** Make sure you are running this command from the directory where you want the `data` folder to be created, as it will be mounted into the container for persistent storage.
+
+To start the container, run:
 
 ```docker
-docker run -d \
+docker run \
+  --restart unless-stopped \
+  -p 8080:8000 \
+  -v "$(pwd)/data:/app/data" \
   --name android-sms-api \
-  -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
-  -e JWT_SECRET=<YOUR_SECURE_SECRET> \
-  agamsol/android-sms-api:0.1
+  agamsol/android-sms-api:latest
 ```
+
+<details>
+<summary><strong>This command will:</strong></summary>
+
+* Pull the image if it’s not already available locally
+* Start a single container named <code>android-sms-api</code>
+* Expose the API on port <strong>8080</strong> (host) mapped to <strong>8000</strong> (container)
+* Persist application data in the local <code>./data</code> directory
+* Automatically restart the container unless it is explicitly stopped
+
+</details>
+
+If you need to perform **device QR pairing** or any other interactive setup, run the container in the foreground (as shown above) so you can see the terminal output.
+
+To stop the container:
+
+```bash
+docker stop android-sms-api
+```
+
+To remove the container:
+
+```bash
+docker rm android-sms-api
+```
+
+For more information about Docker commands and options, see the official Docker documentation:
+[https://docs.docker.com/engine/reference/run/](https://docs.docker.com/engine/reference/run/)
+
 
 ### Docker Compose
-For a more permanent setup, use Docker Compose. Create a `docker-compose.yml` file:
 
-```yaml
-services:
-  android-sms-api:
-    image: agamsol/android-sms-api:0.1
-    container_name: android-sms-api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - JWT_SECRET=<YOUR_SECURE_SECRET>
-      - ADMIN_USERNAME=admin
-      - PLAN_RESET_DAY_OF_MONTH=23
-      - ADB_QR_DEVICE_PAIRING=True
-      # Add other environment variables from the configuration table as needed
+For a persistent, server-ready deployment, use the provided [`docker-compose.yml`](docker-compose.yml) file. This setup is recommended for long-running or production-like environments, as it simplifies service management, networking, and restarts.
+
+> **Important:** Make sure you are in the same directory as the `docker-compose.yml` file before running any Docker Compose commands.
+
+#### Starting the service
+
+To start the service in detached (background) mode, run:
+
+```bash
+docker compose up -d
 ```
+
+This will start the container in the background. Use this mode once everything is already configured.
+
+If you need to perform **device QR pairing** or any other interactive setup, start Docker Compose **without** the `-d` flag so you can see the terminal output and interact when needed:
+
+```bash
+docker compose up
+```
+
+You can stop the service at any time by pressing `Ctrl + C` when running in the foreground.
+
+#### Managing the service
+
+Check the status of the running service:
+
+```bash
+docker compose ps
+```
+
+View logs for the service (useful for debugging):
+
+```bash
+docker compose logs -f
+```
+
+Stop the service without removing the container:
+
+```bash
+docker compose stop
+```
+
+Stop and remove the container, network, and volumes created by Docker Compose:
+
+```bash
+docker compose down -v
+```
+
+For a full list of available commands, configuration options, and advanced usage, see the official Docker Compose documentation:
+[https://docs.docker.com/compose/](https://docs.docker.com/compose/)
+
 
 ---
 
@@ -112,7 +178,7 @@ Create a `.env` file in the root directory using the keys below. You can copy `.
 | `ADB_SHELL_EXECUTION_ROUTE_ENABLED`| Enables the endpoint allowing admins to run raw ADB shell commands. | `True` |
 | `JWT_ALGORITHM` | Algorithm used for signing JSON Web Tokens. | `HS256` |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`| Token validity duration in minutes. | `60` |
-| `JWT_SECRET` | Secret key used to sign the JWT. **Must be specified manually for security reasons.** | **REQUIRED** |
+| `JWT_SECRET` | Secret key used to sign the JWT. **If not specified, a secure random string is automatically generated on startup.** | `<Auto-Generated>` |
 
 ---
 

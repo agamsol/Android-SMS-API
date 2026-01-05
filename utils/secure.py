@@ -4,18 +4,35 @@ from jose.exceptions import ExpiredSignatureError
 from utils.logger import create_logger
 from passlib.context import CryptContext
 from models.authentication import TokenData
+from dotenv import load_dotenv, set_key
 from datetime import datetime, timedelta, timezone
+from models.authentication import generate_random_password
+load_dotenv()
 
 JWT_SECRET = os.getenv("JWT_SECRET", "<RANDOM_SECURE_STRING>")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
+log = create_logger("SECURE", logger_name="ASA_SECURE")
+
+if JWT_SECRET == "<RANDOM_SECURE_STRING>":
+
+    JWT_SECRET = generate_random_password(length=99)
+
+    set_key(
+        dotenv_path=".env",
+        key_to_set="JWT_SECRET",
+        value_to_set=JWT_SECRET
+    )
+
+    log.critical("No JWT_SECRET specified. A new secret has been generated and saved to .env. Please note this down if needed.")
+
 if not JWT_SECRET or JWT_SECRET == "<RANDOM_SECURE_STRING>":
+
+    log.critical("Application startup failed: JWT_SECRET is not set or remains as default placeholder.")
     raise RuntimeError("JWT_SECRET is not set in .env")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-log = create_logger("SECURE", logger_name="ASA_SECURE")
 
 
 class Hash:

@@ -21,8 +21,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 COPY . .
 
-RUN mv .env.example .env
-
 EXPOSE 8000
 
 VOLUME ["/app/data"]
