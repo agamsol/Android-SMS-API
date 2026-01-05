@@ -1,6 +1,6 @@
-# Android SMS API Gateway 0.1 *(No image yet)* 
+# Android SMS API Gateway 0.1 *(Pre-Release)*
 ![Version](https://img.shields.io/badge/Version-0.1_(Pre--Release)-orange)
-![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.13+-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Powered-009688?logo=fastapi&logoColor=white)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen)
 ### Turn your Android device into a professional SMS Server

@@ -1,1 +1,2 @@
+:: local use
 docker build -t android-sms-api:0.1 -t android-sms-api:latest .
