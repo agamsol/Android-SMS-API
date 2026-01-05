@@ -1,0 +1,1 @@
+docker build -t agamachva/android-sms-api:0.1 -t agamachva/android-sms-api:latest .

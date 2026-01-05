@@ -10,6 +10,7 @@ MUST_BE_ADMINISTRATOR_EXCEPTION = HTTPException(
     detail="You are not authorized perform this action!"
 )
 
+
 def generate_random_password(length=10):
 
     custom_specials = "!#$%^&*()[];:<>=-?@_+|{}~"

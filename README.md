@@ -53,9 +53,6 @@ In this API, a "Standard User" is not limited to a human operator. A user entity
 * This allows multiple external applications to share the same physical Android hardware while maintaining isolated quotas and credentials.
 
 ---
-## Deployment
-
-The application is available as a Docker image. For data persistence (logs and database), you **must** mount the `/data` volume.
 
 ## Deployment
 

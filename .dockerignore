@@ -1,0 +1,51 @@
+# --- Version Control ---
+.git
+.gitignore
+
+# --- Python Artifacts (Recursive) ---
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# --- Virtual Environments ---
+.venv
+venv
+env
+
+# --- Secrets & Environment Config ---
+.env
+.env.*
+!.env.example
+
+# Keep .env.example if you have one, but block real keys
+
+# --- Docker & Build Files ---
+Dockerfile
+.dockerignore
+docker-compose.yml
+*.yaml
+*.yml
+
+# --- Data & Logs ---
+**/data
+*.log
+*.sqlite
+*.db
+
+# --- IDE & Editor Settings ---
+.vscode
+.idea
+*.swp
+*.swo
+
+# --- OS Generated Files ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# --- Build Artifacts ---
+dist
+build
+*.egg-info
+*.exe
