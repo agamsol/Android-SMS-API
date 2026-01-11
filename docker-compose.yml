@@ -9,7 +9,7 @@ services:
       - ./data:/app/data
     environment:
       - ADMIN_USERNAME=admin
-      - PLAN_RESET_DAY_OF_MONTH=23
+      - PLAN_RESET_DAY_OF_MONTH=0
       - ADB_QR_DEVICE_PAIRING=True
       - ADB_AUTO_CONNECT=False
       - ADB_DEFAULT_DEVICE=
