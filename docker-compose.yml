@@ -4,6 +4,8 @@ services:
     container_name: android-sms-api
     restart: unless-stopped
     network_mode: host
+    # ports:
+    #   - "8000:8000"
     volumes:
       - ./data:/app/data
     environment:
@@ -12,3 +14,8 @@ services:
       - ADB_QR_DEVICE_PAIRING=True
       - ADB_AUTO_CONNECT=False
       - ADB_DEFAULT_DEVICE=
+
+# define network_mode if you want to use the QR-Pairing feature
+# P.S dont forget to allow firewall port 8000
+
+# define ports:  - "8000:8000" if you rather stick to Code-Pairing
