@@ -1,6 +1,7 @@
 import os
 import re
 import shlex
+import shutil
 import subprocess
 from typing import Optional
 from pydantic import IPvAnyAddress
@@ -35,7 +36,12 @@ class Adb:
             FileNotFoundError: ADB Path not found
         """
 
-        if not os.path.exists(adb_path):
+        abs_path = shutil.which(adb_path)
+
+        if abs_path:
+            adb_path = abs_path
+
+        if not os.path.exists(adb_path) or not abs_path:
             log.critical(f"ADB executable missing at path: {adb_path}")
             raise FileNotFoundError("ADB Initiation Failed: Library path specified was not found!")
 
@@ -105,7 +111,7 @@ class Adb:
 
         return devices
 
-    async def pair_device(self, address: IPvAnyAddress, port: int, password: str) -> bool:
+    async def qr_pair_device(self, address: IPvAnyAddress, port: int, password: str) -> bool:
 
         full_address = str(address) + ":" + str(port)
         log.info(f"Attempting to pair with device at: {full_address}")
@@ -127,6 +133,23 @@ class Adb:
             log.error(f"Pairing timeout expired for {full_address}")
 
         return
+
+    async def code_pair_device(self, device_address: IPvAnyAddress, port: int, pair_code: str):
+
+        log.info(f"Pairing to device via network: {device_address}")
+
+        process = await self.adb_execute(
+            ['pair', str(device_address) + ":" + str(port), str(pair_code)]
+        )
+
+        if "Successfully" in process.stdout:
+            log.info(f"Successfully paired to {device_address}")
+
+        else:
+
+            log.error(f"Pairing attempt failed for {device_address}. Output: {process.stdout.strip()}")
+
+        return process
 
     async def connect_device(self, device_address: IPvAnyAddress = None, adb_port: int = 5555, disable_tcpip_command=False):
 

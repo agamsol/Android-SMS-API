@@ -276,14 +276,14 @@ async def update_message_limit(
 )
 async def delete_account(
     token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    username: BaseUser
+    body: BaseUser
 ):
 
     if not token.administrator:
         raise MUST_BE_ADMINISTRATOR_EXCEPTION
 
     # PREVENT/HANDLE HARDCODED USER DELETION
-    if token.username == ADMIN_USERNAME:
+    if token.username == ADMIN_USERNAME and body.username == ADMIN_USERNAME:
 
         raise HTTPException(
             detail=f"Cannot delete the '{ADMIN_USERNAME}' account because it is a hardcoded system user",
@@ -291,23 +291,23 @@ async def delete_account(
         )
 
     # PREVENT SELF ACCOUNT DELETION
-    if token.username == username:
+    if token.username == body.username:
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete your own account"
         )
 
-    account_deleted = db_helper.delete_account(username)
+    account_deleted = db_helper.delete_account(body.username)
 
     if not account_deleted:
 
         return AccountConfirmationResponse(
-            username=username,
-            detail="Account not found or could not be deleted"
+            username=body.username,
+            detail="Account not found or could not be deleted",
         )
 
     return AccountConfirmationResponse(
-        username=username,
+        username=body.username,
         detail="Account has been deleted"
     )

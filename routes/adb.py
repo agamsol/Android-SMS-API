@@ -9,11 +9,11 @@ from utils.adb_wireless import start_image_pairing_session
 from fastapi import Depends, HTTPException, status, APIRouter
 from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
 from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
-from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, execution_route_enabled, ADB_PAIRING_INSTRUCTIONS
+from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, AdbPairDeviceWithCodeRequest, execution_route_enabled, ADB_QR_PAIRING_INSTRUCTIONS, ADB_PAIRING_INSTRUCTIONS
 
 load_dotenv()
 
-ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
+ADB_PATH = os.path.join("adb")
 ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED = os.getenv("ADB_DISABLE_SHELL_EXECUTION_ROUTE_ENABLED", "false").lower() == "true"
 
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
@@ -46,11 +46,11 @@ async def adb_list_devices(
 
 
 @router.get(
-    "/pair-device",
+    "/qr-pair-device",
     summary="Pairing a new Android device over the network via QR code",
     status_code=status.HTTP_200_OK,
     response_class=StreamingResponse,
-    description=ADB_PAIRING_INSTRUCTIONS,
+    description=ADB_QR_PAIRING_INSTRUCTIONS,
     responses={
         200: {
             "content": {"image/png": {}},
@@ -58,7 +58,7 @@ async def adb_list_devices(
         }
     }
 )
-async def adb_pair_device(
+async def adb_qr_pair_device(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
 ) -> StreamingResponse:
 
@@ -68,6 +68,34 @@ async def adb_pair_device(
     listener, image_bytes = start_image_pairing_session(timeout=300)
 
     return StreamingResponse(image_bytes, media_type="image/png")
+
+
+@router.post(
+    "/pair-device",
+    summary="Pairing a new Android device over the network via Pairing Code",
+    status_code=status.HTTP_200_OK,
+    response_model=AdbConnectDeviceResponse,
+    description=ADB_PAIRING_INSTRUCTIONS
+)
+async def adb_code_pair_device(
+    account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+    body: AdbPairDeviceWithCodeRequest
+):
+
+    if not account.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    process = await adb.code_pair_device(
+        device_address=str(body.address),
+        port=body.port,
+        pair_code=body.pair_code
+    )
+
+    return AdbConnectDeviceResponse(
+        detail="Device has been successfully paired",
+        device_id=f"{body.address}:{body.port}",
+        adb_output=str(process.stdout)
+    )
 
 
 @router.post(

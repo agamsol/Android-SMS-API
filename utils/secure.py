@@ -51,11 +51,13 @@ class JWToken:
     @staticmethod
     async def create(username: str, remember_me: bool = False):
 
-        expire = datetime.now(timezone.utc) + (timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES))
+        expire_token_minutes = 5256000 if remember_me else JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+
+        expire = datetime.now(timezone.utc) + (timedelta(minutes=expire_token_minutes))
 
         encoded_data = {
             "username": username,
-            "exp": expire if not remember_me else 0
+            "exp": expire
         }
 
         log.debug(f"Generating JWT. User: {username}, Remember Me: {remember_me}, Exp: {encoded_data['exp']}")

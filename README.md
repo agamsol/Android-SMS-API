@@ -1,5 +1,5 @@
-# Android SMS API Gateway 0.1 *(Pre-Release)*
-![Version](https://img.shields.io/badge/Version-0.1_(Pre--Release)-orange)
+# Android SMS API Gateway 0.2 *(Pre-Release)*
+![Version](https://img.shields.io/badge/Version-0.2_(Pre--Release)-orange)
 ![Python](https://img.shields.io/badge/Python-3.13+-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Powered-009688?logo=fastapi&logoColor=white)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen)
@@ -14,6 +14,7 @@ This application transforms any Android device into a dedicated, self-hosted **S
   - [The User Concept](#the-user-concept)
 - [Deployment](#deployment)
   - [Docker](#docker)
+    - [How to find the specific device path](#how-to-find-the-specific-device-path)
   - [Docker Compose](#docker-compose)
 - [Environment Configuration](#environment-configuration)
 - [User Management System](#user-management-system)
@@ -29,6 +30,7 @@ This application transforms any Android device into a dedicated, self-hosted **S
     - [Trigger the QR Code](#trigger-the-qr-code)
     - [Pairing Instructions](#pairing-instructions)
     - [Verify Connection](#verify-connection)
+- [Whats New In 0.2](#whats-new-in-02-pre-release)
 
 ---
 
@@ -49,7 +51,7 @@ This application transforms any Android device into a dedicated, self-hosted **S
 
 ### The "User" Concept
 In this API, a "Standard User" is not limited to a human operator. A user entity functions effectively as a **Service Account** or **API Key**.
-* **Example Use Case**: You can create a user named `alert-system` with a 500-message limit and a separate user named `marketing-bot` with a 5,000-message limit. 
+* **Example Use Case**: You can create a user named `alert-system` with a 500-message limit and a separate user named `marketing-bot` with a 5,000-message limit.
 * This allows multiple external applications to share the same physical Android hardware while maintaining isolated quotas and credentials.
 
 ---
@@ -58,17 +60,39 @@ In this API, a "Standard User" is not limited to a human operator. A user entity
 
 The application is available as a Docker image. For data persistence (logs and database), you **must** mount the `/data` volume.
 
+> Requirement: To pair a device, you must run this container with Host Networking enabled or map the device via USB Passthrough.
+
 ### Docker
 Run the container directly using Docker. This method is useful for quick setups, testing, or when you don’t need Docker Compose.
 
-> **Important:** Make sure you are running this command from the directory where you want the `data` folder to be created, as it will be mounted into the container for persistent storage.
+Here is the refined block. I have structured it to clearly separate the "Whole Bus" (recommended) method from the "Specific Device" method, while adding the necessary warning about hot-plugging reliability.
+
+> **Important:**
+> * **Persistence:** Execute this command from the directory where you want the `data` folder to be created.
+> * **Connectivity:** If you'd like to use the **QR-Pairing** feature replace `-p 8000:8000` with `--net=host` (Flag Working Only On Linux Environments)
+> * **Passthrough:**
+>
+>   **Whole Bus (Recommended):** Use `--device /dev/bus/usb:/dev/bus/usb`. This allows the container to detect the phone even if it is unplugged and replugged.
+>
+>   **Specific Device:** Use `--device /dev/bus/usb/XXX/YYY` (replace with your specific device path found via `lsusb`).
+>   * *Warning: This binds to a specific file descriptor. If the cable is disconnected, the device node ID will change, and the container will lose access until you update the command and restart it.*
+
+### How to find the specific device path
+
+If you choose the specific device method, users will need to know how to find that path. You might want to add this small tip below the block:
+
+```bash
+# Run 'lsusb' on the host to find the Bus and Device numbers
+# Example Output: Bus 001 Device 004: ID 18d1:4ee7 Google Inc.
+# Path: /dev/bus/usb/001/004
+```
 
 To start the container, run:
 
 ```docker
 docker run \
   --restart unless-stopped \
-  -p 8080:8000 \
+  -p 8000:8000 \
   -v "$(pwd)/data:/app/data" \
   --name android-sms-api \
   agamsol/android-sms-api:latest
@@ -79,10 +103,9 @@ docker run \
 
 * Pull the image if it’s not already available locally
 * Start a single container named <code>android-sms-api</code>
-* Expose the API on port <strong>8080</strong> (host) mapped to <strong>8000</strong> (container)
+* Expose the API on port <strong>8000</strong> (host) mapped to <strong>8000</strong> (container)
 * Persist application data in the local <code>./data</code> directory
 * Automatically restart the container unless it is explicitly stopped
-
 </details>
 
 If you need to perform **device QR pairing** or any other interactive setup, run the container in the foreground (as shown above) so you can see the terminal output.
@@ -256,3 +279,20 @@ Once the QR code is displayed:
 After scanning, the pairing process completes automatically. You can confirm success by:
 * Checking the terminal logs for a "Successfully Paired" message.
 * Calling the `GET /adb/list-devices` endpoint to verify your device appears with the status `authorized`.
+
+# What's New in 0.2 (Pre-release)
+#### Features & Improvements
+
+- Added a new API route to support pairing devices via a 6-digit code, offering an alternative to QR code scanning.
+
+- Replaced the embedded ADB binary with the system-level android-tools-adb package. This improves stability and compatibility across different container environments.
+
+#### Bug Fixes
+
+- Fixed major bugs that made delete-account endpoint not to work
+
+- Resolved connectivity issues preventing successful wireless device pairing in Dockerized environments.
+
+- Fixed an issue where remember_me tokens were not persisting correctly; tokens now utilize a 10-year expiration for long-term sessions.
+
+- Corrected username validator logic and pattern. Usernames can now be 3–32 characters long, include numbers and hyphens (previously restricted to 10 characters maximum and no numbers were allowed).

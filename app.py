@@ -14,8 +14,10 @@ from utils.logger import create_logger
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.adb_wireless import start_terminal_pairing_session
 from utils.scheduler import monthly_message_reset
+
 load_dotenv()
 
+VERSION = os.getenv("VERSION", "0.2")
 ADB_QR_DEVICE_PAIRING = os.getenv("ADB_QR_DEVICE_PAIRING", "true").lower() == "true"
 ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
 ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
@@ -63,6 +65,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Android-SMS-API",
+    version=VERSION,
     description="Turn your Android phone into a programmable SMS server. A lightweight HTTP API wrapper around ADB for sending text messages over cellular network",
     lifespan=lifespan,
     responses={

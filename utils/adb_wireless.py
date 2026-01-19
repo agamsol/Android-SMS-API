@@ -12,9 +12,9 @@ from utils.adb import Adb
 from utils.logger import create_logger
 from zeroconf import ServiceBrowser, Zeroconf
 
-from models.adb import ADB_PAIRING_INSTRUCTIONS
+from models.adb import ADB_QR_PAIRING_INSTRUCTIONS
 
-ADB_PATH = os.path.join("src", "bin", "adb.exe" if os.name == 'win' else 'adb')
+ADB_PATH = os.path.join("adb")
 adb = Adb(ADB_PATH)
 
 log = create_logger("ADB-WIRELESS", logger_name="ASA_ADB_WIRELESS")
@@ -60,7 +60,7 @@ class AdbListener:
     def pair_device_successful(self, address, port, password) -> bool:
 
         process: subprocess.CompletedProcess = asyncio.run(
-            adb.pair_device(address, port, password)
+            adb.qr_pair_device(address, port, password)
         )
 
         if process.returncode == 0 and "Successfully paired" in process.stdout:
@@ -139,7 +139,7 @@ def start_terminal_pairing_session(timeout=180):
 
     qr.print_ascii(invert=True)
 
-    plain_text_pairing_instructions = ((ADB_PAIRING_INSTRUCTIONS.replace("*", "")).replace("_", "")).replace("#", "")  # I never chain like this but its ok lol (forbidden: *_#)
+    plain_text_pairing_instructions = ((ADB_QR_PAIRING_INSTRUCTIONS.replace("*", "")).replace("_", "")).replace("#", "")  # I never chain like this but its ok lol (forbidden: *_#)
 
     log.info(plain_text_pairing_instructions)
 

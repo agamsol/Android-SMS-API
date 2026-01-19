@@ -22,7 +22,7 @@ def generate_random_password(length=10):
 
 class BaseUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    username: str = Field(min_length=3, max_length=32)
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")
 
 
 class CreateUser(BaseUser):
@@ -69,13 +69,13 @@ class TokenData(BaseModel):
 
 
 class LoginObtainToken(BaseModel):
-    username: Annotated[str, Form(min_length=3, max_length=32)]
+    username: Annotated[str, Form(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")]
     password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
     remember_me: Annotated[bool, Form()] = False
 
 
 def login_obtain_token(
-    username: Annotated[str, Form(min_length=3, max_length=32)],
+    username: Annotated[str, Form(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")],
     password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")],
     remember_me: Annotated[bool, Form()] = False
 ):
@@ -88,7 +88,7 @@ def login_obtain_token(
 
 
 class CreateUserParams(BaseModel):
-    username: Annotated[str, Field(min_length=3, max_length=32)]
+    username: Annotated[str, Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")]
     password: Annotated[str, Field(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
     messages_limit: Annotated[int, Field()] = 50
     administrator: Annotated[bool, Field()] = False
@@ -106,6 +106,7 @@ class ResetAccountPasswordRequest(CreateUser):
 class AccountConfirmationResponse(BaseUser):
     detail: Literal[
         "Account has been deleted",
+        "Account not found or could not be deleted",
         "Account password has been changed",
         "Message limit has been updated"
     ]
