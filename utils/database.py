@@ -82,9 +82,7 @@ class SQLiteDb:
 
         log.warning("Initiating full reset of message history.")
         cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM messages")
-
-        cursor.execute("DELETE FROM sqlite_sequence WHERE name='messages'")
+        cursor.execute(f"DELETE FROM {self.messages_table_name} ")
 
         self.conn.commit()
         log.info("All messages have been wiped from the database.")
