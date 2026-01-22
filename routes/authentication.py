@@ -100,7 +100,7 @@ async def login_for_access_token(
         if not ((credentials.username == ADMIN_USERNAME) and (credentials.password == ADMIN_PASSWORD)):
             raise credentials_exception
 
-        access_token = await JWToken.create(username=ADMIN_USERNAME)
+        access_token = await JWToken.create(username=ADMIN_USERNAME, remember_me=credentials.remember_me)
 
         return Token(
             access_token=access_token,
@@ -117,7 +117,7 @@ async def login_for_access_token(
     if not verified_user:
         raise credentials_exception
 
-    access_token = await JWToken.create(username=credentials.username)
+    access_token = await JWToken.create(username=credentials.username, remember_me=credentials.remember_me)
 
     return Token(
         access_token=access_token,
