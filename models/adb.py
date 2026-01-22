@@ -87,12 +87,13 @@ class AdbPairDeviceWithCodeRequest(BaseModel):
     port: int = Field(..., ge=1, le=65535)
     pair_code: str = Field(..., pattern=r"^\d{6}$", description="6-digit pairing code")
 
+
 class AdbConnectDeviceRequest(BaseModel):
-    device_id: str = Field(..., min_length=4, max_length=35)
+    device_id: str
 
 
 class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
-    adb_output: str = Field(..., max_length=99)
+    adb_output: str
 
 # Example for possible regexes (future update)
 # pattern=r"^(972|0)5[023458]\d{7}$",
