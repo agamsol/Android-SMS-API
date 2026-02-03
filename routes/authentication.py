@@ -3,7 +3,7 @@ from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer
-from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse, generate_random_password
+from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse, generate_random_password, UserListResponse, UserStats
 from utils.models.database import User_Model
 from utils.database import SQLiteDb
 from utils.secure import JWToken, Hash
@@ -62,8 +62,13 @@ async def authenticate_with_token(
     if user is None:
         raise credentials_exception
 
+    messages_count = db_helper.count_messages(user['username'])
+
+    messages_left = user['messages_limit'] - messages_count
+
     return AdditionalAccountData(
-        **user
+        **user,
+        messages_left=messages_left
     )
 
 
@@ -78,6 +83,45 @@ async def get_current_user(
 ):
 
     return current_user
+
+
+@router.get(
+    "/list-users",
+    response_model=UserListResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Account Management"]
+)
+async def list_users(
+    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
+):
+
+    if not token.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    users = db_helper.get_all_users()
+    user_stats_list = []
+
+    user_stats_list.append(UserStats(
+        username=ADMIN_USERNAME,
+        messages_limit=0,
+        current_usage=db_helper.count_messages(ADMIN_USERNAME),
+        administrator=True
+    ))
+
+    for user in users:
+
+        usage = db_helper.count_messages(user['username'])
+
+        user_stats = UserStats(
+            username=user['username'],
+            messages_limit=user['messages_limit'],
+            current_usage=usage,
+            administrator=user['administrator']
+        )
+
+        user_stats_list.append(user_stats)
+    
+    return UserListResponse(users=user_stats_list)
 
 
 @router.post(

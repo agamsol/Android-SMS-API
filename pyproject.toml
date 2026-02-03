@@ -1,6 +1,6 @@
 [project]
 name = "Android-SMS-API"
-version = "0.2"
+version = "0.3"
 description = "Turn your Android phone into a programmable SMS server. A lightweight HTTP API wrapper around ADB for sending text messages over cellular network"
 readme = "README.md"
 requires-python = ">=3.13"

@@ -89,7 +89,7 @@ class AdbPairDeviceWithCodeRequest(BaseModel):
 
 
 class AdbConnectDeviceRequest(BaseModel):
-    device_id: str
+    device_id: Optional[str] = Field(None, min_length=4, max_length=99, description="The unique identifier (serial) of the Android device. If omitted, a random available device will be selected.", examples=[None])
 
 
 class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
@@ -100,8 +100,7 @@ class AdbConnectDeviceResponse(AdbConnectDeviceRequest, AdbDetailResponse):
 # description="Must start with 05x (10 digits) or 9725x (12 digits). Allowed providers: 0,2,3,4,5,8."
 
 
-class AdbSendTextMessageRequest(BaseModel):
-    device_id: Optional[str] = Field(None, min_length=4, max_length=35, description="The unique identifier (serial) of the Android device. If omitted, a random available device will be selected.", examples=[None])
+class AdbSendTextMessageRequest(AdbConnectDeviceRequest):
     phone_number: str = Field(..., pattern=r"^\+[1-9]\d{1,14}$")
     message: str
 
@@ -122,3 +121,16 @@ class AdbProcessResult(BaseModel):
     returncode: int = Field(..., description="Exit status of the process (0 usually means success)")
     stdout: str = Field(..., description="Standard output from the command")
     stderr: str = Field(..., description="Standard error from the command")
+
+
+class AdbMessage(BaseModel):
+    id: str = Field(..., description="The unique message ID")
+    address: Optional[str] = Field(None, description="The phone number or address associated with the message")
+    body: str = Field(..., description="The content of the message")
+    date: Optional[int] = Field(None, description="The timestamp of the message")
+    type: Literal['sent', 'received', 'unknown'] = Field(..., description="The type of the message")
+
+
+class AdbConversation(BaseModel):
+    phone_number: str = Field(..., description="The phone number associated with the messages")
+    messages: list[AdbMessage] = Field(..., description="List of messages exchanged with this phone number")

@@ -4,6 +4,7 @@ import shlex
 import shutil
 import subprocess
 from typing import Optional
+from collections import defaultdict
 from pydantic import IPvAnyAddress
 from utils.logger import create_logger
 
@@ -243,3 +244,70 @@ class Adb:
 
         log.error(f"SMS command failed. Device: {device_name}, Output: {parcel.stdout.strip()}")
         return False, str(device_name)
+
+    async def list_messages(self, device_id: Optional[str] = None) -> list[dict]:
+
+        log.debug(f"Listing messages for device: {device_id}")
+
+        command = []
+        if device_id:
+            command.extend(["-s", device_id])
+
+        command.extend(["shell", "content", "query", "--uri", "content://sms/", "--projection", "_id:address:body:date:type"])
+
+        process = await self.adb_execute(command)
+
+        if process.returncode != 0:
+            log.error(f"Failed to list messages. Output: {process.stderr}")
+            return []
+
+        output = process.stdout
+        grouped_messages = defaultdict(list)
+        row_pattern = re.compile(r"Row: \d+ (.*)")
+
+        for line in output.strip().split('\n'):
+            match = row_pattern.search(line)
+            if not match: continue
+
+            fields_str = match.group(1)
+            parts = re.split(r', (?=\w+=)', fields_str)
+
+            row_data = {}
+            for part in parts:
+                if '=' in part:
+                    key, val = part.split('=', 1)
+                    row_data[key.strip()] = val.strip()
+
+            msg_type = row_data.get('type', '1')
+            if msg_type == '1':
+                msg_type_str = 'received'
+            elif msg_type == '2':
+                msg_type_str = 'sent'
+            else:
+                msg_type_str = 'unknown'
+
+            try:
+                date_val = int(row_data.get('date', 0))
+            except ValueError:
+                date_val = None
+
+            msg_entry = {
+                "type": msg_type_str,
+                "body": row_data.get('body', ''),
+                "date": date_val,
+                "id": row_data.get('_id'),
+                "address": row_data.get('address')
+            }
+            address = row_data.get('address', 'Unknown')
+            grouped_messages[address].append(msg_entry)
+
+        conversations = []
+        for address, msgs in grouped_messages.items():
+
+            msgs.sort(key=lambda x: x['date'] or 0)
+            conversations.append({
+                "phone_number": address,
+                "messages": msgs
+            })
+
+        return conversations

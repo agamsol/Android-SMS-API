@@ -1,5 +1,5 @@
-# Android SMS API Gateway 0.2 *(Pre-Release)*
-![Version](https://img.shields.io/badge/Version-0.2_(Pre--Release)-orange)
+# Android SMS API Gateway 0.3 *(Pre-Release)*
+![Version](https://img.shields.io/badge/Version-0.3_(Pre--Release)-orange)
 ![Python](https://img.shields.io/badge/Python-3.13+-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Powered-009688?logo=fastapi&logoColor=white)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen)
@@ -30,7 +30,7 @@ This application transforms any Android device into a dedicated, self-hosted **S
     - [Trigger the QR Code](#trigger-the-qr-code)
     - [Pairing Instructions](#pairing-instructions)
     - [Verify Connection](#verify-connection)
-- [Whats New In 0.2](#whats-new-in-02-pre-release)
+- [Whats New In 0.3](#whats-new-in-03-pre-release)
 
 ---
 
@@ -280,19 +280,18 @@ After scanning, the pairing process completes automatically. You can confirm suc
 * Checking the terminal logs for a "Successfully Paired" message.
 * Calling the `GET /adb/list-devices` endpoint to verify your device appears with the status `authorized`.
 
-# What's New in 0.2 (Pre-release)
+# What's New in 0.3 (Pre-release)
 #### Features & Improvements
 
-- Added a new API route to support pairing devices via a 6-digit code, offering an alternative to QR code scanning.
+- Added a route to get and list all conversations on the device
 
-- Replaced the embedded ADB binary with the system-level android-tools-adb package. This improves stability and compatibility across different container environments.
+- Added a route to list all users
+
+- `GET /auth/@me` now returns how many messages are left for the current month
+
+> **_P.S. Parts of this release are preperations for the UI Interface which is coming VERY soon!_**
 
 #### Bug Fixes
 
-- Fixed major bugs that made delete-account endpoint not to work
-
-- Resolved connectivity issues preventing successful wireless device pairing in Dockerized environments.
-
-- Fixed an issue where remember_me tokens were not persisting correctly; tokens now utilize a 10-year expiration for long-term sessions.
-
-- Corrected username validator logic and pattern. Usernames can now be 3–32 characters long, include numbers and hyphens (previously restricted to 10 characters maximum and no numbers were allowed).
+- Timeout handling for ADB `POST /adb/connect-device` - trace back to client
+- `device_id` was limited to 35 characters (raised to 99) - code pairing devices have longer names than 35 characters

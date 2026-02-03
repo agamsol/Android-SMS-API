@@ -56,6 +56,7 @@ class CreateUser(BaseUser):
 class AdditionalAccountData(BaseUser):
     messages_limit: int = 50
     administrator: bool = False
+    messages_left: Optional[int] = None
 
 
 class Token(BaseModel):
@@ -118,3 +119,14 @@ class MessageLimitUpdateResponse(AccountConfirmationResponse):
 
 class UpdateMessageLimitRequest(BaseUser):
     messages_limit: int = Field(50, ge=0, description="New monthly message limit for the user")
+
+
+class UserStats(BaseUser):
+    messages_limit: int
+    current_usage: int
+    administrator: bool
+
+
+class UserListResponse(BaseModel):
+    users: list[UserStats]
+

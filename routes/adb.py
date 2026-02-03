@@ -1,6 +1,7 @@
 import os
 import time
-from typing import Annotated
+import subprocess
+from typing import Annotated, Optional
 from dotenv import load_dotenv
 from utils.database import SQLiteDb
 from fastapi.responses import StreamingResponse
@@ -9,7 +10,7 @@ from utils.adb_wireless import start_image_pairing_session
 from fastapi import Depends, HTTPException, status, APIRouter
 from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
 from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
-from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, AdbPairDeviceWithCodeRequest, execution_route_enabled, ADB_QR_PAIRING_INSTRUCTIONS, ADB_PAIRING_INSTRUCTIONS
+from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, AdbPairDeviceWithCodeRequest, execution_route_enabled, ADB_QR_PAIRING_INSTRUCTIONS, ADB_PAIRING_INSTRUCTIONS, AdbMessage, AdbConversation
 
 load_dotenv()
 
@@ -43,6 +44,25 @@ async def adb_list_devices(
     devices_list = await adb.get_devices()
 
     return devices_list
+
+
+@router.get(
+    "/list-messages",
+    summary="List all SMS messages from a connected device",
+    status_code=status.HTTP_200_OK,
+    response_model=list[AdbConversation]
+)
+async def adb_list_messages(
+    account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
+    device_id: Optional[str] = None
+):
+
+    if not account.administrator:
+        raise MUST_BE_ADMINISTRATOR_EXCEPTION
+
+    messages = await adb.list_messages(device_id=device_id)
+
+    return messages
 
 
 @router.get(
@@ -134,17 +154,24 @@ async def adb_connect_device(
 
     response_detail = "ADB Error while connecting to device!"
 
-    device = await adb.connect_device(body.device_id)
+    try:
+        device = await adb.connect_device(body.device_id)
 
-    if "connected" in device.stdout or "already" in device.stdout:
+        if "connected" in device.stdout or "already" in device.stdout:
 
-        response_detail = "ADB is now connected to device"
+            response_detail = "ADB is now connected to device"
 
-    return AdbConnectDeviceResponse(
-        detail=response_detail,
-        device_id=body.device_id,
-        adb_output=device.stdout
-    )
+        return AdbConnectDeviceResponse(
+            detail=response_detail,
+            device_id=body.device_id,
+            adb_output=device.stdout
+        )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="The connection attempt to the device timed out."
+        )
 
 
 @router.post(

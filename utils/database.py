@@ -103,6 +103,14 @@ class SQLiteDb:
 
         return query
 
+    def get_all_users(self):
+
+        log.debug("Fetching all users")
+        cursor = self.conn.cursor()
+        cursor.execute(f"SELECT * FROM {self.users_table_name}")
+
+        return cursor.fetchall()
+
     def insert_user(self, user_model: User_Model):
 
         data = user_model.model_dump(mode="json")
