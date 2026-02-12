@@ -9,6 +9,8 @@ from utils.models.database import Message_Model
 from utils.adb_wireless import start_image_pairing_session
 from fastapi import Depends, HTTPException, status, APIRouter
 from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
+from utils.secure import JWToken
 from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
 from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, AdbPairDeviceWithCodeRequest, execution_route_enabled, ADB_QR_PAIRING_INSTRUCTIONS, ADB_PAIRING_INSTRUCTIONS, AdbMessage, AdbConversation
 
@@ -37,9 +39,6 @@ router = APIRouter(
 async def adb_list_devices(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
 ):
-
-    if not account.administrator:
-        raise MUST_BE_ADMINISTRATOR_EXCEPTION
 
     devices_list = await adb.get_devices()
 
@@ -187,16 +186,14 @@ async def adb_send_text_message(
 
     messages_sent = 0
 
-    messages_sent = db_helper.count_messages(account.username)
-
-    if not account.administrator:
-
+    if account.token_id:
+        messages_sent = db_helper.count_token_messages(account.token_id)
+        # Enforce limit for API Tokens
         if messages_sent >= account.messages_limit:
-
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You have reached your monthly message limit"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Monthly limit exceeded")
+    else:
+        # For Admin, just count total or ignore
+        messages_sent = db_helper.count_messages(account.username)
 
     try:
 
@@ -213,6 +210,7 @@ async def adb_send_text_message(
                 message=body.message,
                 sent_to=body.phone_number,
                 sent_time=int(time.time()),
+                token_id=account.token_id
             )
 
             db_helper.insert_message(message_payload)

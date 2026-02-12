@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from utils.database import SQLiteDb
-from routes import health, authentication, adb
+from routes import health, authentication, adb, tokens
 from routes.authentication import ADMIN_USERNAME, ADMIN_PASSWORD
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
@@ -199,6 +199,10 @@ app.include_router(
 app.include_router(
     router=authentication.router,
     prefix="/auth"
+)
+
+app.include_router(
+    router=tokens.router
 )
 
 app.include_router(

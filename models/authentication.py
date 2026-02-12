@@ -11,9 +11,12 @@ MUST_BE_ADMINISTRATOR_EXCEPTION = HTTPException(
 )
 
 
-def generate_random_password(length=10):
+def generate_random_password(length=10, custom_specials=True):
 
-    custom_specials = "!#$%^&*()[];:<>=-?@_+|{}~"
+    if custom_specials:
+        custom_specials = "!#$%^&*()[];:<>=-?@_+|{}~"
+    else:
+        custom_specials = ""
 
     characters = string.ascii_letters + string.digits + custom_specials
     password = ''.join(random.choice(characters) for _ in range(length))
@@ -57,6 +60,7 @@ class AdditionalAccountData(BaseUser):
     messages_limit: int = 50
     administrator: bool = False
     messages_left: Optional[int] = None
+    token_id: Optional[str] = None
 
 
 class Token(BaseModel):
@@ -129,4 +133,30 @@ class UserStats(BaseUser):
 
 class UserListResponse(BaseModel):
     users: list[UserStats]
+
+
+class CreateTokenRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    messages_limit: int = Field(ge=0)
+
+
+class UpdateTokenRequest(BaseModel):
+    messages_limit: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+class TokenResponse(BaseModel):
+    id: str
+    token: str
+    name: str
+    messages_limit: int
+
+
+class TokenStats(BaseModel):
+    id: str
+    name: str
+    messages_limit: int
+    current_usage: int
+    is_active: bool
+    created_at: str # datetime serialized
 

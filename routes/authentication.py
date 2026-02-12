@@ -1,8 +1,9 @@
 import os
+import hashlib
 from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse, generate_random_password, UserListResponse, UserStats
 from utils.models.database import User_Model
 from utils.database import SQLiteDb
@@ -27,14 +28,18 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
 db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 router = APIRouter()
 
-
 async def authenticate_with_token(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    api_key: Annotated[str | None, Depends(api_key_header)] = None
 ) -> AdditionalAccountData:
-    """This function verifies that the request has a valid token input"""
+    """
+    Verifies the request has a valid token (Admin JWT or API Token).
+    Supports Bearer token (Admin/API) and X-API-Key header (API).
+    """
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,87 +47,88 @@ async def authenticate_with_token(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    try:
+    if token:
+        try:
+            token_data = await JWToken.verify(token)
+            if token_data.username == ADMIN_USERNAME:
+                 return AdditionalAccountData(
+                     username=token_data.username,
+                     messages_limit=0,
+                     administrator=True,
+                     token_id=None
+                 )
+        except ValueError:
+            pass 
 
-        token_data = await JWToken.verify(token)
+        try:
+            token_id = await JWToken.verify_api_token(token)
+            record = db_helper.get_token_by_id(token_id)
+            
+            if record:
 
-    except ValueError:
-        raise credentials_exception
+                token_hash = hashlib.sha256(token.encode()).hexdigest()
+                if token_hash != record['token_hash']:
+                    raise HTTPException(status_code=401, detail="Token has been refreshed and this version is invalid.")
 
-    if token_data.username == ADMIN_USERNAME:
+                if not record['is_active']:
+                    raise HTTPException(status_code=403, detail="Token has been revoked")
+                    
+                usage = db_helper.count_token_messages(token_id)
 
-        return AdditionalAccountData(
-            username=token_data.username,
-            messages_limit=0,
-            administrator=True
-        )
+                return AdditionalAccountData(
+                    username=record['name'], 
+                    messages_limit=record['messages_limit'],
+                    administrator=False,
+                    messages_left=record['messages_limit'] - usage,
+                    token_id=token_id
+                )
+        except ValueError:
+            pass
 
-    user = db_helper.get_user(token_data.username)
+    if api_key:
+        try:
+            token_id = await JWToken.verify_api_token(api_key)
+            record = db_helper.get_token_by_id(token_id)
+            
+            if not record:
+                 raise credentials_exception
+            
+            token_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            if token_hash != record['token_hash']:
+                raise HTTPException(status_code=401, detail="Token has been refreshed and this version is invalid.")
 
-    if user is None:
-        raise credentials_exception
-
-    messages_count = db_helper.count_messages(user['username'])
-
-    messages_left = user['messages_limit'] - messages_count
-
-    return AdditionalAccountData(
-        **user,
-        messages_left=messages_left
-    )
+            if not record['is_active']:
+                 raise HTTPException(status_code=403, detail="Token has been revoked")
+                 
+            usage = db_helper.count_token_messages(token_id)
+            
+            return AdditionalAccountData(
+                username=record['name'], 
+                messages_limit=record['messages_limit'],
+                administrator=False,
+                messages_left=record['messages_limit'] - usage,
+                token_id=token_id
+            )
+            
+        except ValueError:
+             pass
+             
+    raise credentials_exception
 
 
 @router.get(
     "/@me",
     response_model=AdditionalAccountData,
     status_code=status.HTTP_200_OK,
-    tags=["Authentication"]
+    tags=["Authentication"],
+    summary="Get current account/token details",
+    description="Returns details about the currently authenticated entity (User or API Token). Includes message limits and remaining quota for API Tokens."
 )
 async def get_current_user(
     current_user: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
 ):
 
     return current_user
-
-
-@router.get(
-    "/list-users",
-    response_model=UserListResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Account Management"]
-)
-async def list_users(
-    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)]
-):
-
-    if not token.administrator:
-        raise MUST_BE_ADMINISTRATOR_EXCEPTION
-
-    users = db_helper.get_all_users()
-    user_stats_list = []
-
-    user_stats_list.append(UserStats(
-        username=ADMIN_USERNAME,
-        messages_limit=0,
-        current_usage=db_helper.count_messages(ADMIN_USERNAME),
-        administrator=True
-    ))
-
-    for user in users:
-
-        usage = db_helper.count_messages(user['username'])
-
-        user_stats = UserStats(
-            username=user['username'],
-            messages_limit=user['messages_limit'],
-            current_usage=usage,
-            administrator=user['administrator']
-        )
-
-        user_stats_list.append(user_stats)
-    
-    return UserListResponse(users=user_stats_list)
-
 
 @router.post(
     "/login",
@@ -151,207 +157,7 @@ async def login_for_access_token(
             token_type="bearer"
         )
 
-    user_payload: dict = db_helper.get_user(username=credentials.username)
-
-    if not user_payload:
-        raise credentials_exception
-
-    verified_user = await Hash.verify_password(credentials.password, user_payload.get("hashed_password"))
-
-    if not verified_user:
-        raise credentials_exception
-
-    access_token = await JWToken.create(username=credentials.username, remember_me=credentials.remember_me)
-
-    return Token(
-        access_token=access_token,
-        token_type="bearer"
-    )
+    raise credentials_exception
 
 
-@router.post(
-    "/create-account",
-    summary="Create an account with a monthly limitted messages cap",
-    response_model=AdditionalAccountData,
-    status_code=status.HTTP_201_CREATED,
-    tags=["Account Management"]
-)
-async def create_account(
-    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    body: CreateUserParams,
-):
 
-    username = body.username
-    password = body.password
-    messages_limit = body.messages_limit
-    administrator = body.administrator
-
-    password_data = CreateUser(username=username, password=password)
-    credentials = AdditionalAccountData(
-        username=username,
-        messages_limit=messages_limit,
-        administrator=administrator
-    )
-
-    if not token.administrator:
-        raise MUST_BE_ADMINISTRATOR_EXCEPTION
-
-    if db_helper.get_user(credentials.username) or credentials.username == ADMIN_PASSWORD:
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered",
-        )
-
-    hashed_password = await Hash.create(password_data.password)
-
-    user_payload = User_Model(
-        username=credentials.username,
-        hashed_password=hashed_password,
-        messages_limit=credentials.messages_limit,
-        administrator=credentials.administrator
-    )
-
-    db_helper.insert_user(user_payload)
-
-    return user_payload
-
-
-@router.put(
-    "/reset-password",
-    summary="Reset password for a specific account. Users can reset their own password without administrator privileges.",
-    response_model=AccountConfirmationResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Account Management"]
-)
-async def reset_account_password(
-    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    body: ResetAccountPasswordRequest,
-):
-
-    # USER IS ALLOWED TO RESET ITS OWN PASSWORD WITHOUT ADMINISTRATOR PERMISSION WHILE ADMINISTRATORS CAN ALSO RESET ITS PASSWORD
-    if not token.administrator and token.username != body.username:
-        raise MUST_BE_ADMINISTRATOR_EXCEPTION
-
-    if body.username == ADMIN_USERNAME:
-
-        raise HTTPException(
-            detail=f"Cannot reset password for '{ADMIN_USERNAME}' account. It is a hardcoded system user; change it in the config file",
-            status_code=status.HTTP_403_FORBIDDEN
-        )
-
-    user = db_helper.get_user(body.username)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found"
-        )
-
-    password_data = CreateUser(username=body.username, password=body.password)
-
-    hashed_password = await Hash.create(password_data.password)
-
-    account_password_changed = db_helper.change_password(password_data.username, hashed_password)
-
-    if not account_password_changed:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update password"
-        )
-
-    return AccountConfirmationResponse(
-        username=body.username,
-        detail="Account password has been changed"
-    )
-
-
-@router.put(
-    "/message-limit",
-    summary="Update monthly message limit for a user",
-    response_model=MessageLimitUpdateResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Account Management"]
-)
-async def update_message_limit(
-    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    body: UpdateMessageLimitRequest,
-):
-
-    if not token.administrator:
-        raise MUST_BE_ADMINISTRATOR_EXCEPTION
-
-    if body.username == ADMIN_USERNAME:
-
-        raise HTTPException(
-            detail=f"Cannot update message limit for '{ADMIN_USERNAME}' account. It is a hardcoded system user",
-            status_code=status.HTTP_403_FORBIDDEN
-        )
-
-    user = db_helper.get_user(body.username)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found"
-        )
-
-    account_updated = db_helper.update_message_limit(body.username, body.messages_limit)
-
-    if not account_updated:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update message limit"
-        )
-
-    return MessageLimitUpdateResponse(
-        username=body.username,
-        detail="Message limit has been updated",
-        messages_limit=body.messages_limit
-    )
-
-
-@router.delete(
-    "/delete-account",
-    summary="",
-    response_model=AccountConfirmationResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["Account Management"]
-)
-async def delete_account(
-    token: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
-    body: BaseUser
-):
-
-    if not token.administrator:
-        raise MUST_BE_ADMINISTRATOR_EXCEPTION
-
-    # PREVENT/HANDLE HARDCODED USER DELETION
-    if token.username == ADMIN_USERNAME and body.username == ADMIN_USERNAME:
-
-        raise HTTPException(
-            detail=f"Cannot delete the '{ADMIN_USERNAME}' account because it is a hardcoded system user",
-            status_code=status.HTTP_403_FORBIDDEN
-        )
-
-    # PREVENT SELF ACCOUNT DELETION
-    if token.username == body.username:
-
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot delete your own account"
-        )
-
-    account_deleted = db_helper.delete_account(body.username)
-
-    if not account_deleted:
-
-        return AccountConfirmationResponse(
-            username=body.username,
-            detail="Account not found or could not be deleted",
-        )
-
-    return AccountConfirmationResponse(
-        username=body.username,
-        detail="Account has been deleted"
-    )

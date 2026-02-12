@@ -90,7 +90,34 @@ class JWToken:
             log.debug("JWT verification failed: Token signature has expired.")
             raise ValueError("Could not validate credentials")
 
-        except JWTError as e:
+    @staticmethod
+    async def create_api_token(token_id: str):
 
-            log.debug(f"JWT verification failed. Error: {str(e)}")
-            raise ValueError("Could not validate credentials")
+        encoded_data = {
+            "id": token_id,
+            "type": "api",
+            "iat": datetime.now(timezone.utc)
+        }
+        
+        encoded_jwt = jwt.encode(encoded_data, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        return encoded_jwt
+
+    @staticmethod
+    async def verify_api_token(token: str) -> str:
+
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+            if payload.get("type") != "api":
+                raise ValueError("Invalid token type")
+
+            token_id = payload.get("id")
+
+            if not token_id:
+                raise ValueError("Invalid token content")
+
+            return token_id
+
+        except Exception as e:
+            log.debug(f"API Token verification failed: {e}")
+            raise ValueError("Could not validate token")
