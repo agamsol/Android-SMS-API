@@ -1,9 +1,11 @@
 import os
 import uvicorn
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from utils.database import SQLiteDb
@@ -24,6 +26,7 @@ ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
 ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
 PLAN_RESET_DAY_OF_MONTH = int(os.getenv("PLAN_RESET_DAY_OF_MONTH", "0"))
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
@@ -209,6 +212,27 @@ app.include_router(
     router=adb.router,
     prefix="/adb"
 )
+
+if STATIC_DIR.is_dir():
+
+    log.info(f"Serving frontend static files from: {STATIC_DIR}")
+
+    assets_dir = STATIC_DIR / "assets"
+
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(request: Request, full_path: str):
+
+        file_path = STATIC_DIR / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(STATIC_DIR / "index.html"))
+
+else:
+
+    log.warning(f"Static directory not found at {STATIC_DIR}. Frontend will not be served.")
 
 if __name__ == "__main__":
 
