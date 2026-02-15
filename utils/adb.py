@@ -245,29 +245,14 @@ class Adb:
         log.error(f"SMS command failed. Device: {device_name}, Output: {parcel.stdout.strip()}")
         return False, str(device_name)
 
-    async def list_messages(self, device_id: Optional[str] = None) -> list[dict]:
-
-        log.debug(f"Listing messages for device: {device_id}")
-
-        command = []
-        if device_id:
-            command.extend(["-s", device_id])
-
-        command.extend(["shell", "content", "query", "--uri", "content://sms/", "--projection", "_id:address:body:date:type"])
-
-        process = await self.adb_execute(command)
-
-        if process.returncode != 0:
-            log.error(f"Failed to list messages. Output: {process.stderr}")
-            return []
-
-        output = process.stdout
-        grouped_messages = defaultdict(list)
+    def _parse_content_query_output(self, output: str) -> list[dict]:
+        results = []
         row_pattern = re.compile(r"Row: \d+ (.*)")
 
         for line in output.strip().split('\n'):
             match = row_pattern.search(line)
-            if not match: continue
+            if not match:
+                continue
 
             fields_str = match.group(1)
             parts = re.split(r', (?=\w+=)', fields_str)
@@ -277,29 +262,141 @@ class Adb:
                 if '=' in part:
                     key, val = part.split('=', 1)
                     row_data[key.strip()] = val.strip()
+            
+            if row_data:
+                results.append(row_data)
+        
+        return results
 
-            msg_type = row_data.get('type', '1')
-            if msg_type == '1':
-                msg_type_str = 'received'
-            elif msg_type == '2':
-                msg_type_str = 'sent'
-            else:
-                msg_type_str = 'unknown'
+    async def list_messages(self, device_id: Optional[str] = None) -> list[dict]:
 
-            try:
-                date_val = int(row_data.get('date', 0))
-            except ValueError:
-                date_val = None
+        log.debug(f"Listing messages for device: {device_id}")
 
-            msg_entry = {
-                "type": msg_type_str,
-                "body": row_data.get('body', ''),
-                "date": date_val,
-                "id": row_data.get('_id'),
-                "address": row_data.get('address')
+        base_command = []
+        if device_id:
+            base_command.extend(["-s", device_id])
+
+        # 1. Fetch SMS Fetching
+        sms_command = base_command + ["shell", "content", "query", "--uri", "content://sms/", "--projection", "_id:address:body:date:type"]
+        sms_process = await self.adb_execute(sms_command)
+        
+        grouped_messages = defaultdict(list)
+
+        if sms_process.returncode == 0:
+            sms_rows = self._parse_content_query_output(sms_process.stdout)
+            
+            for row in sms_rows:
+                msg_type = row.get('type', '1')
+                if msg_type == '1':
+                    msg_type_str = 'received'
+                elif msg_type == '2':
+                    msg_type_str = 'sent'
+                else:
+                    msg_type_str = 'unknown'
+
+                try:
+                    date_val = int(row.get('date', 0))
+                except ValueError:
+                    date_val = 0
+
+                msg_entry = {
+                    "type": msg_type_str,
+                    "body": row.get('body', ''),
+                    "date": date_val,
+                    "id": row.get('_id'),
+                    "address": row.get('address')
+                }
+                address = row.get('address', 'Unknown')
+                grouped_messages[address].append(msg_entry)
+        else:
+             log.error(f"Failed to list SMS messages. Output: {sms_process.stderr}")
+
+        # 2. Fetch MMS Messages
+        mms_command = base_command + ["shell", "content", "query", "--uri", "content://mms/", "--projection", "_id:date:msg_box:sub:m_type"]
+        mms_process = await self.adb_execute(mms_command)
+        
+        mms_messages = {}
+        if mms_process.returncode == 0:
+
+            mms_rows = self._parse_content_query_output(mms_process.stdout)
+
+            for row in mms_rows:
+                m_id = row.get('_id')
+                if m_id:
+                    mms_messages[m_id] = {
+                        "id": m_id,
+                        "date": int(row.get('date', 0)) * 1000,
+                        "msg_box": row.get('msg_box'),
+                        "sub": row.get('sub', ''),
+                        "body": "",
+                        "address": "Unknown",
+                        "type": "unknown"
+                    }
+
+        # 3. Fetch MMS Parts (For Body)
+        part_command = base_command + ["shell", "content", "query", "--uri", "content://mms/part", "--projection", "mid:ct:text"]
+        part_process = await self.adb_execute(part_command)
+
+        if part_process.returncode == 0:
+            part_rows = self._parse_content_query_output(part_process.stdout)
+            for row in part_rows:
+                mid = row.get('mid')
+                ct = row.get('ct')
+                text = row.get('text')
+                
+                if mid in mms_messages and ct == "text/plain" and text:
+                    mms_messages[mid]["body"] = text
+
+        # 4. Fetch MMS Addresses (For Sender/Receiver)
+        # type=137 (From), type=151 (To)
+        addr_command = base_command + ["shell", "content", "query", "--uri", "content://mms/addr", "--projection", "msg_id:address:type"]
+        addr_process = await self.adb_execute(addr_command)
+
+        if addr_process.returncode == 0:
+            addr_rows = self._parse_content_query_output(addr_process.stdout)
+            for row in addr_rows:
+                msg_id = row.get('msg_id')
+                address = row.get('address')
+                addr_type = row.get('type')
+
+                if msg_id in mms_messages and address:
+                    if "insert-address-token" in address:
+                        continue
+                        
+                    curr_msg = mms_messages[msg_id]
+
+                    if curr_msg['msg_box'] == '1':
+                        curr_msg['type'] = 'received'
+
+                        if addr_type == '137':
+                            curr_msg['address'] = address
+
+                    elif curr_msg['msg_box'] == '2':
+                        
+                        curr_msg['type'] = 'sent'
+                        
+                        if addr_type == '151':
+                            curr_msg['address'] = address
+        
+        for msg in mms_messages.values():
+
+            if not msg['body'] and msg['sub']:
+                msg['body'] = f"[MMS] {msg['sub']}"
+
+            elif not msg['body']:
+                msg['body'] = "[MMS Media]"
+
+            final_msg_entry = {
+                "type": msg['type'],
+                "body": msg['body'],
+                "date": msg['date'],
+                "id": msg['id'],
+                "address": msg['address']
             }
-            address = row_data.get('address', 'Unknown')
-            grouped_messages[address].append(msg_entry)
+
+            grouped_messages[msg['address']].append(final_msg_entry)
+
+
 
         conversations = []
         for address, msgs in grouped_messages.items():
