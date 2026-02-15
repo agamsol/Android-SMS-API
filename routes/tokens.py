@@ -11,6 +11,7 @@ from utils.models.database import APITokenInDB
 from utils.secure import JWToken, Hash
 from utils.database import SQLiteDb
 from routes.authentication import authenticate_with_token
+from utils.scheduler import get_billing_cycle_start
 
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
 db_helper = SQLiteDb(database_path=DATABASE_PATH)
@@ -74,7 +75,7 @@ async def list_tokens(
     result = []
     
     for t in tokens:
-        usage = db_helper.count_token_messages(t['id'])
+        usage = db_helper.count_token_messages(t['id'], since_timestamp=get_billing_cycle_start())
         result.append(TokenStats(
             id=t['id'],
             name=t['name'],
@@ -113,7 +114,7 @@ async def update_token_route(
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update token")
 
-    usage = db_helper.count_token_messages(token_id)
+    usage = db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
     
     return TokenStats(
         id=updated['id'],

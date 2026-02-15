@@ -1,40 +1,47 @@
 import os
-from datetime import datetime
+import time
+from datetime import datetime, date
 from calendar import monthrange
 from dotenv import load_dotenv
-from utils.database import SQLiteDb
 from utils.logger import create_logger
 
 load_dotenv()
 
 PLAN_RESET_DAY_OF_MONTH = int(os.getenv("PLAN_RESET_DAY_OF_MONTH", "0"))
-DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
-db_helper = SQLiteDb(database_path=DATABASE_PATH)
-database = db_helper.connect()
 
 log = create_logger("SCHEDULER", logger_name="ASA_SCHEDULER")
 
 
-def should_run_today(day: int) -> bool:
+def get_billing_cycle_start(reset_day: int = PLAN_RESET_DAY_OF_MONTH) -> int:
+    """
+    Calculate the Unix timestamp (seconds) for the start of the current billing cycle.
 
-    if day <= 0:
-        return False
+    If reset_day is 0, returns 0 (no filtering — all messages count).
+    Otherwise, finds the most recent occurrence of that day:
+      - If today >= reset_day: billing started this month on reset_day
+      - If today < reset_day: billing started last month on reset_day
 
-    today = datetime.now()
+    Returns the Unix timestamp at midnight (00:00:00) of the billing cycle start date.
+    """
 
-    _, days_in_current_month = monthrange(today.year, today.month)
+    if reset_day <= 0:
+        return 0
 
-    target_day = min(int(day), days_in_current_month)
+    today = date.today()
 
-    return today.day == target_day
+    if today.day >= reset_day:
+        year, month = today.year, today.month
+    else:
+        if today.month == 1:
+            year, month = today.year - 1, 12
+        else:
+            year, month = today.year, today.month - 1
 
+    _, max_day = monthrange(year, month)
+    clamped_day = min(reset_day, max_day)
 
-def monthly_message_reset():
+    cycle_start = datetime(year, month, clamped_day, 0, 0, 0)
+    timestamp = int(cycle_start.timestamp())
 
-    if should_run_today(PLAN_RESET_DAY_OF_MONTH):
-        log.critical(f"Initiating global monthly message count reset. Configured Reset Day: {PLAN_RESET_DAY_OF_MONTH}")
-        db_helper.reset_all_messages()
-
-        return True
-
-    return False
+    log.debug(f"Billing cycle start: {cycle_start.strftime('%Y-%m-%d')} (timestamp: {timestamp}), reset_day={reset_day}")
+    return timestamp

@@ -14,9 +14,7 @@ from routes.authentication import ADMIN_USERNAME, ADMIN_PASSWORD
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
 from utils.logger import create_logger
-from apscheduler.schedulers.background import BackgroundScheduler
 from utils.adb_wireless import start_terminal_pairing_session
-from utils.scheduler import monthly_message_reset
 
 load_dotenv()
 
@@ -38,14 +36,6 @@ log = create_logger(alias="APP", logger_name="ASA_APP")
 async def lifespan(app: FastAPI):
 
     log.info("Application startup: Initializing background services.")
-
-    if PLAN_RESET_DAY_OF_MONTH != 0:
-
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(monthly_message_reset, 'cron', hour=0, minute=0)
-        scheduler.start()
-
-        log.info("Background scheduler started. Monthly reset job scheduled.")
 
     connection_failed = False
 

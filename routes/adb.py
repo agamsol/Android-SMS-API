@@ -12,7 +12,9 @@ from utils.adb import Adb, DeviceUnavailable, DeviceConnectionError
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from utils.secure import JWToken
 from routes.authentication import authenticate_with_token, AdditionalAccountData, MUST_BE_ADMINISTRATOR_EXCEPTION
-from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, AdbPairDeviceWithCodeRequest, execution_route_enabled, ADB_QR_PAIRING_INSTRUCTIONS, ADB_PAIRING_INSTRUCTIONS, AdbMessage, AdbConversation
+from collections import defaultdict
+from models.adb import AdbListDevices, AdbDetailResponse, AdbConnectDeviceRequest, AdbConnectDeviceResponse, AdbSendTextMessageRequest, AdbMessageSentResponse, AdbShellExecuteRequest, AdbProcessResult, AdbPairDeviceWithCodeRequest, execution_route_enabled, ADB_QR_PAIRING_INSTRUCTIONS, ADB_PAIRING_INSTRUCTIONS, AdbMessage, AdbConversation, AdbListMessagesResponse
+from utils.scheduler import get_billing_cycle_start
 
 load_dotenv()
 
@@ -47,9 +49,9 @@ async def adb_list_devices(
 
 @router.get(
     "/list-messages",
-    summary="List all SMS messages from a connected device",
+    summary="List all SMS messages from a connected device and application database",
     status_code=status.HTTP_200_OK,
-    response_model=list[AdbConversation]
+    response_model=AdbListMessagesResponse
 )
 async def adb_list_messages(
     account: Annotated[AdditionalAccountData, Depends(authenticate_with_token)],
@@ -59,9 +61,29 @@ async def adb_list_messages(
     if not account.administrator:
         raise MUST_BE_ADMINISTRATOR_EXCEPTION
 
-    messages = await adb.list_messages(device_id=device_id)
+    device_messages = await adb.list_messages(device_id=device_id)
 
-    return messages
+    db_rows = db_helper.get_all_messages()
+    grouped = defaultdict(list)
+
+    for row in db_rows:
+        grouped[row["sent_to"]].append({
+            "id": f"db-{row['sent_time']}",
+            "address": row["sent_to"],
+            "body": row["message"],
+            "date": row["sent_time"] * 1000,
+            "type": "sent"
+        })
+
+    database_messages = [
+        {"phone_number": phone, "messages": msgs}
+        for phone, msgs in grouped.items()
+    ]
+
+    return {
+        "device_messages": device_messages,
+        "database_messages": database_messages
+    }
 
 
 @router.get(
@@ -187,13 +209,11 @@ async def adb_send_text_message(
     messages_sent = 0
 
     if account.token_id:
-        messages_sent = db_helper.count_token_messages(account.token_id)
-        # Enforce limit for API Tokens
+        messages_sent = db_helper.count_token_messages(account.token_id, since_timestamp=get_billing_cycle_start())
         if messages_sent >= account.messages_limit:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Monthly limit exceeded")
     else:
-        # For Admin, just count total or ignore
-        messages_sent = db_helper.count_messages(account.username)
+        messages_sent = db_helper.count_messages(account.username, since_timestamp=get_billing_cycle_start())
 
     try:
 

@@ -223,20 +223,39 @@ class SQLiteDb:
 
         return current_user
 
-    def count_messages(self, username: str) -> int:
+    def count_messages(self, username: str, since_timestamp: int = 0) -> int:
 
         cursor = self.conn.cursor()
 
-        cursor.execute(
-            f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE username = ?",
-            (username,)
-        )
+        if since_timestamp > 0:
+            cursor.execute(
+                f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE username = ? AND sent_time >= ?",
+                (username, since_timestamp)
+            )
+        else:
+            cursor.execute(
+                f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE username = ?",
+                (username,)
+            )
 
         result = cursor.fetchone()
         count = result['count'] if result else 0
 
-        log.debug(f"Message count for {username}: {count}")
+        log.debug(f"Message count for {username}: {count} (since_timestamp={since_timestamp})")
         return count
+
+    def get_all_messages(self) -> list[dict]:
+
+        cursor = self.conn.cursor()
+
+        cursor.execute(
+            f"SELECT username, message, sent_to, sent_time, token_id FROM {self.messages_table_name} ORDER BY sent_time ASC"
+        )
+
+        results = cursor.fetchall()
+
+        log.debug(f"Retrieved {len(results)} messages from database")
+        return results
 
     def insert_message(self, message_model: Message_Model) -> None:
         data = message_model.model_dump(mode="json")
@@ -331,14 +350,20 @@ class SQLiteDb:
         self.conn.commit()
         return cursor.rowcount > 0
 
-    def count_token_messages(self, token_id: str) -> int:
+    def count_token_messages(self, token_id: str, since_timestamp: int = 0) -> int:
 
         cursor = self.conn.cursor()
-        
-        cursor.execute(
-            f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE token_id = ?",
-            (token_id,)
-        ) 
+
+        if since_timestamp > 0:
+            cursor.execute(
+                f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE token_id = ? AND sent_time >= ?",
+                (token_id, since_timestamp)
+            )
+        else:
+            cursor.execute(
+                f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE token_id = ?",
+                (token_id,)
+            )
 
         result = cursor.fetchone()
         return result['count'] if result else 0

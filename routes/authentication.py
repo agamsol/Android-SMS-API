@@ -8,6 +8,7 @@ from models.authentication import CreateUser, Token, AdditionalAccountData, Crea
 from utils.models.database import User_Model
 from utils.database import SQLiteDb
 from utils.secure import JWToken, Hash
+from utils.scheduler import get_billing_cycle_start
 
 load_dotenv()
 
@@ -49,14 +50,21 @@ async def authenticate_with_token(
 
     if token:
         try:
+
             token_data = await JWToken.verify(token)
+
             if token_data.username == ADMIN_USERNAME:
-                 return AdditionalAccountData(
-                     username=token_data.username,
-                     messages_limit=0,
-                     administrator=True,
-                     token_id=None
-                 )
+
+                admin_usage = db_helper.count_messages(ADMIN_USERNAME, since_timestamp=get_billing_cycle_start())
+
+                return AdditionalAccountData(
+                    username=token_data.username,
+                    messages_limit=0,
+                    administrator=True,
+                    messages_sent=admin_usage,
+                    token_id=None
+                )
+
         except ValueError:
             pass 
 
@@ -73,12 +81,13 @@ async def authenticate_with_token(
                 if not record['is_active']:
                     raise HTTPException(status_code=403, detail="Token has been revoked")
                     
-                usage = db_helper.count_token_messages(token_id)
+                usage = db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
 
                 return AdditionalAccountData(
                     username=record['name'], 
                     messages_limit=record['messages_limit'],
                     administrator=False,
+                    messages_sent=usage,
                     messages_left=record['messages_limit'] - usage,
                     token_id=token_id
                 )
@@ -100,12 +109,13 @@ async def authenticate_with_token(
             if not record['is_active']:
                  raise HTTPException(status_code=403, detail="Token has been revoked")
                  
-            usage = db_helper.count_token_messages(token_id)
+            usage = db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
             
             return AdditionalAccountData(
                 username=record['name'], 
                 messages_limit=record['messages_limit'],
                 administrator=False,
+                messages_sent=usage,
                 messages_left=record['messages_limit'] - usage,
                 token_id=token_id
             )

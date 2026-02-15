@@ -59,6 +59,7 @@ class CreateUser(BaseUser):
 class AdditionalAccountData(BaseUser):
     messages_limit: int = 50
     administrator: bool = False
+    messages_sent: int = 0
     messages_left: Optional[int] = None
     token_id: Optional[str] = None
 

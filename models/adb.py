@@ -134,3 +134,8 @@ class AdbMessage(BaseModel):
 class AdbConversation(BaseModel):
     phone_number: str = Field(..., description="The phone number associated with the messages")
     messages: list[AdbMessage] = Field(..., description="List of messages exchanged with this phone number")
+
+
+class AdbListMessagesResponse(BaseModel):
+    device_messages: list[AdbConversation] = Field(..., description="SMS messages retrieved from the connected Android device")
+    database_messages: list[AdbConversation] = Field(..., description="SMS messages logged in the application database")
