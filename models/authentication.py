@@ -61,6 +61,7 @@ class AdditionalAccountData(BaseUser):
     administrator: bool = False
     messages_sent: int = 0
     messages_left: Optional[int] = None
+    next_reset: int = 0
     token_id: Optional[str] = None
 
 

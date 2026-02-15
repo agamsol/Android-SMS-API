@@ -8,7 +8,7 @@ from models.authentication import CreateUser, Token, AdditionalAccountData, Crea
 from utils.models.database import User_Model
 from utils.database import SQLiteDb
 from utils.secure import JWToken, Hash
-from utils.scheduler import get_billing_cycle_start
+from utils.scheduler import get_billing_cycle_start, get_billing_cycle_end
 
 load_dotenv()
 
@@ -62,6 +62,7 @@ async def authenticate_with_token(
                     messages_limit=0,
                     administrator=True,
                     messages_sent=admin_usage,
+                    next_reset=get_billing_cycle_end(),
                     token_id=None
                 )
 
@@ -89,6 +90,7 @@ async def authenticate_with_token(
                     administrator=False,
                     messages_sent=usage,
                     messages_left=record['messages_limit'] - usage,
+                    next_reset=get_billing_cycle_end(),
                     token_id=token_id
                 )
         except ValueError:
@@ -117,6 +119,7 @@ async def authenticate_with_token(
                 administrator=False,
                 messages_sent=usage,
                 messages_left=record['messages_limit'] - usage,
+                next_reset=get_billing_cycle_end(),
                 token_id=token_id
             )
             

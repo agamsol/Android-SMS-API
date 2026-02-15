@@ -28,7 +28,7 @@ router = APIRouter(
 async def get_status():
 
     return StatusResponseModel(
-        version=os.getenv("VERSION", "0.2"),
+        version=os.getenv("VERSION", "0.4"),
         filesystem=os.name,
         maintenance=False
     )

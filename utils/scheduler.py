@@ -45,3 +45,38 @@ def get_billing_cycle_start(reset_day: int = PLAN_RESET_DAY_OF_MONTH) -> int:
 
     log.debug(f"Billing cycle start: {cycle_start.strftime('%Y-%m-%d')} (timestamp: {timestamp}), reset_day={reset_day}")
     return timestamp
+
+
+def get_billing_cycle_end(reset_day: int = PLAN_RESET_DAY_OF_MONTH) -> int:
+    """
+    Calculate the Unix timestamp (seconds) for the next billing cycle reset.
+
+    If reset_day is 0, returns 0 (no reset configured).
+    Otherwise, finds the next occurrence of that day:
+      - If today >= reset_day: next reset is next month on reset_day
+      - If today < reset_day: next reset is this month on reset_day
+
+    Returns the Unix timestamp at midnight (00:00:00) of the next reset date.
+    """
+
+    if reset_day <= 0:
+        return 0
+
+    today = date.today()
+
+    if today.day >= reset_day:
+        if today.month == 12:
+            year, month = today.year + 1, 1
+        else:
+            year, month = today.year, today.month + 1
+    else:
+        year, month = today.year, today.month
+
+    _, max_day = monthrange(year, month)
+    clamped_day = min(reset_day, max_day)
+
+    cycle_end = datetime(year, month, clamped_day, 0, 0, 0)
+    timestamp = int(cycle_end.timestamp())
+
+    log.debug(f"Billing cycle end (next reset): {cycle_end.strftime('%Y-%m-%d')} (timestamp: {timestamp}), reset_day={reset_day}")
+    return timestamp
