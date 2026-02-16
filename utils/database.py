@@ -45,11 +45,10 @@ class SQLiteDb:
 
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self.messages_table_name} (
-                username TEXT NOT NULL,
+                token_id TEXT NOT NULL,
                 message TEXT,
                 sent_to TEXT NOT NULL,
                 sent_time INTEGER NOT NULL,
-                token_id TEXT DEFAULT NULL,
                 FOREIGN KEY(token_id) REFERENCES {self.tokens_table_name}(id)
             )
         """)
@@ -66,7 +65,7 @@ class SQLiteDb:
         """)
         self.conn.commit()
 
-        # Migrations  
+        # Migrations for older versions
 
         # from 0.3 to 0.4: Add token_id column to messages table
         cursor.execute(f"PRAGMA table_info({self.messages_table_name})")
@@ -94,6 +93,40 @@ class SQLiteDb:
                 except sqlite3.OperationalError as e:
                     log.error(f"Migration failed: {e}")
 
+        # from 0.4 to 0.5: Replace username with token_id in messages table
+        cursor.execute(f"PRAGMA table_info({self.messages_table_name})")
+        columns = [info['name'] for info in cursor.fetchall()]
+
+        if "username" in columns:
+
+            if os.getenv("MIGRATE_DATABASE", "False").lower() != "true":
+                log.critical("DATABASE MIGRATION REQUIRED! The 'token_id' column is missing in the 'messages' table.")
+                log.critical("To apply the migration, set the environment variable MIGRATE_DATABASE=True and restart the application.")
+                
+                os._exit(1)
+
+            log.info("Migrating database 0.4 -> 0.5: Converting username to token_id.")
+
+            try:
+                self.conn.execute("BEGIN TRANSACTION")
+                
+                cursor.execute(f"CREATE TABLE messages_new (token_id TEXT NOT NULL, message TEXT, sent_to TEXT NOT NULL, sent_time INTEGER NOT NULL, FOREIGN KEY(token_id) REFERENCES {self.tokens_table_name}(id))")
+                
+                cursor.execute(f"INSERT INTO messages_new (token_id, message, sent_to, sent_time) SELECT username, message, sent_to, sent_time FROM {self.messages_table_name}")
+                
+                cursor.execute(f"DROP TABLE {self.messages_table_name}")
+
+                cursor.execute(f"ALTER TABLE messages_new RENAME TO {self.messages_table_name}")
+                
+                self.conn.commit()
+                log.info("Migration 0.4 -> 0.5 successful: Replaced username with token_id.")
+
+            except sqlite3.Error as e:
+
+                self.conn.rollback()
+                log.critical(f"Migration 0.4 -> 0.5 failed: {e}")
+                raise e
+
     def connect(self, force_database_name: str = None):
 
         if force_database_name:
@@ -120,33 +153,14 @@ class SQLiteDb:
         self.conn.commit()
         log.info("All messages have been wiped from the database.")
 
-    async def count_messages(self, username: str, since_timestamp: int = 0) -> int:
 
-        cursor = self.conn.cursor()
-
-        if since_timestamp > 0:
-            cursor.execute(
-                f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE username = ? AND sent_time >= ?",
-                (username, since_timestamp)
-            )
-        else:
-            cursor.execute(
-                f"SELECT COUNT(*) as count FROM {self.messages_table_name} WHERE username = ?",
-                (username,)
-            )
-
-        result = cursor.fetchone()
-        count = result['count'] if result else 0
-
-        log.debug(f"Message count for {username}: {count} (since_timestamp={since_timestamp})")
-        return count
 
     async def get_all_messages(self) -> list[dict]:
 
         cursor = self.conn.cursor()
 
         cursor.execute(
-            f"SELECT username, message, sent_to, sent_time, token_id FROM {self.messages_table_name} ORDER BY sent_time ASC"
+            f"SELECT token_id, message, sent_to, sent_time FROM {self.messages_table_name} ORDER BY sent_time ASC"
         )
 
         results = cursor.fetchall()
@@ -155,16 +169,17 @@ class SQLiteDb:
         return results
 
     async def insert_message(self, message_model: Message_Model) -> None:
+        
         data = message_model.model_dump(mode="json")
 
-        log.debug(f"Inserting message. User: {message_model.username}, To: {message_model.sent_to}, Token: {message_model.token_id}")
+        log.debug(f"Inserting message. To: {message_model.sent_to}, Token: {message_model.token_id}")
 
         cursor = self.conn.cursor()
 
         cursor.execute(
             f"""INSERT INTO {self.messages_table_name}
-               (username, message, sent_to, sent_time, token_id)
-               VALUES (:username, :message, :sent_to, :sent_time, :token_id)""",
+               (message, sent_to, sent_time, token_id)
+               VALUES (:message, :sent_to, :sent_time, :token_id)""",
             data
         )
         self.conn.commit()

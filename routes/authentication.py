@@ -55,7 +55,7 @@ async def authenticate_with_token(
 
             if token_data.username == ADMIN_USERNAME:
 
-                admin_usage = await db_helper.count_messages(ADMIN_USERNAME, since_timestamp=get_billing_cycle_start())
+                admin_usage = await db_helper.count_token_messages(ADMIN_USERNAME, since_timestamp=get_billing_cycle_start())
 
                 return AdditionalAccountData(
                     administrator=True,

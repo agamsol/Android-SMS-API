@@ -16,7 +16,6 @@ class APITokenInDB(APIToken_Model):
 
 
 class Message_Model(BaseModel):
-    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")
     token_id: Optional[str] = Field(None, description="ID of the API Token used to send this message")
     message: str = ""
     sent_to: str = Field(

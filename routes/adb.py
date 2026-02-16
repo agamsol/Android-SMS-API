@@ -209,11 +209,11 @@ async def adb_send_text_message(
     messages_sent = 0
 
     if account.token_id:
+
         messages_sent = await db_helper.count_token_messages(account.token_id, since_timestamp=get_billing_cycle_start())
+
         if not account.messages_limit == 0 and messages_sent >= account.messages_limit:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Monthly limit exceeded")
-    else:
-        messages_sent = await db_helper.count_messages(account.username, since_timestamp=get_billing_cycle_start())
 
     try:
 

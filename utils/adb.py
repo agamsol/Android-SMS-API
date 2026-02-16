@@ -2,7 +2,9 @@ import os
 import re
 import shlex
 import shutil
+import asyncio
 import subprocess
+from fastapi import HTTPException, status
 from typing import Optional
 from collections import defaultdict
 from pydantic import IPvAnyAddress
@@ -54,25 +56,54 @@ class Adb:
 
         try:
 
-            process = subprocess.run(
-                [self.adb_path] + command,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=timeout,
-                errors="replace"
+            process = await asyncio.create_subprocess_exec(
+                self.adb_path, *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
 
-            if process.returncode != 0:
-                log.warning(f"ADB command failed. Cmd: {' '.join(command)}, Return Code: {process.returncode}, Stderr: {process.stderr.strip()}")
+            try:
+                stdout_result, stderr_result = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            
+            except asyncio.TimeoutError:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.communicate()
+                raise subprocess.TimeoutExpired(cmd=[self.adb_path] + command, timeout=timeout)
+
+            stdout_str = stdout_result.decode('utf-8', errors='replace') if stdout_result else ""
+            stderr_str = stderr_result.decode('utf-8', errors='replace') if stderr_result else ""
+
+            completed_process = subprocess.CompletedProcess(
+                args=[self.adb_path] + command,
+                returncode=process.returncode,
+                stdout=stdout_str,
+                stderr=stderr_str
+            )
+
+            if completed_process.returncode != 0:
+
+                if "more than one device" in completed_process.stderr:
+                    
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="More than one device connected, Please select a device and try again"
+                    )
+
+                log.warning(f"ADB command failed. Cmd: {' '.join(command)}, Return Code: {completed_process.returncode}, Stderr: {completed_process.stderr.strip()}")
+
+
+            
             else:
                 log.debug(f"ADB command successful. Cmd: {' '.join(command)}")
+            
+            return completed_process
 
         except FileNotFoundError:
             log.critical(f"ADB execution failed: Executable not found at {self.adb_path}")
             raise FileNotFoundError("ADB path specified was not found!")
-
-        return process
 
     async def get_devices(self):
 
