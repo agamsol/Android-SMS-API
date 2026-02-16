@@ -22,30 +22,6 @@ def generate_random_password(length=10, custom_specials=True):
     password = ''.join(random.choice(characters) for _ in range(length))
     return password
 
-
-class BaseUser(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    username: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")
-
-class AdditionalAccountData(BaseUser):
-    messages_limit: int = 50
-    administrator: bool = False
-    messages_sent: int = 0
-    messages_left: Optional[int] = None
-    next_reset: int = 0
-    token_id: Optional[str] = None
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-    exp: Optional[int] = None
-
-
 class LoginObtainToken(BaseModel):
     username: Annotated[str, Form(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")]
     password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
@@ -64,32 +40,22 @@ def login_obtain_token(
         remember_me=remember_me
     )
 
-
-class AccountConfirmationResponse(BaseUser):
-    detail: Literal[
-        "Account has been deleted",
-        "Account not found or could not be deleted",
-        "Account password has been changed",
-        "Message limit has been updated"
-    ]
+class AdditionalAccountData(BaseModel):
+    administrator: bool = False
+    messages_limit: int = 50
+    messages_sent: int = 0
+    next_plan_reset: int = 0
+    token_id: Optional[str] = None
 
 
-class MessageLimitUpdateResponse(AccountConfirmationResponse):
-    messages_limit: int
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 
-class UpdateMessageLimitRequest(BaseUser):
-    messages_limit: int = Field(50, ge=0, description="New monthly message limit for the user")
-
-
-class UserStats(BaseUser):
-    messages_limit: int
-    current_usage: int
-    administrator: bool
-
-
-class UserListResponse(BaseModel):
-    users: list[UserStats]
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    exp: Optional[int] = None
 
 
 class CreateTokenRequest(BaseModel):

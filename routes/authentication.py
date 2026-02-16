@@ -4,7 +4,7 @@ from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
-from models.authentication import Token, AdditionalAccountData, LoginObtainToken, login_obtain_token,  MUST_BE_ADMINISTRATOR_EXCEPTION, generate_random_password
+from models.authentication import Token, AdditionalAccountData, LoginObtainToken, login_obtain_token, MUST_BE_ADMINISTRATOR_EXCEPTION, generate_random_password
 from utils.database import SQLiteDb
 from utils.secure import JWToken
 from utils.scheduler import get_billing_cycle_start, get_billing_cycle_end
@@ -48,6 +48,7 @@ async def authenticate_with_token(
     )
 
     if token:
+
         try:
 
             token_data = await JWToken.verify(token)
@@ -57,12 +58,11 @@ async def authenticate_with_token(
                 admin_usage = await db_helper.count_messages(ADMIN_USERNAME, since_timestamp=get_billing_cycle_start())
 
                 return AdditionalAccountData(
-                    username=token_data.username,
-                    messages_limit=0,
                     administrator=True,
+                    messages_limit=0,
                     messages_sent=admin_usage,
-                    next_reset=get_billing_cycle_end(),
-                    token_id=None
+                    next_plan_reset=get_billing_cycle_end(),
+                    token_id=ADMIN_USERNAME
                 )
 
         except ValueError:
@@ -84,12 +84,10 @@ async def authenticate_with_token(
                 usage = await db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
 
                 return AdditionalAccountData(
-                    username=record['name'], 
-                    messages_limit=record['messages_limit'],
                     administrator=False,
+                    messages_limit=record['messages_limit'],
                     messages_sent=usage,
-                    messages_left=record['messages_limit'] - usage,
-                    next_reset=get_billing_cycle_end(),
+                    next_plan_reset=get_billing_cycle_end(),
                     token_id=token_id
                 )
         except ValueError:
@@ -113,17 +111,15 @@ async def authenticate_with_token(
             usage = await db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
             
             return AdditionalAccountData(
-                username=record['name'], 
-                messages_limit=record['messages_limit'],
                 administrator=False,
+                messages_limit=record['messages_limit'],
                 messages_sent=usage,
-                messages_left=record['messages_limit'] - usage,
-                next_reset=get_billing_cycle_end(),
+                next_plan_reset=get_billing_cycle_end(),
                 token_id=token_id
             )
             
         except ValueError:
-             pass
+            pass
              
     raise credentials_exception
 

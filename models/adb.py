@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from typing import Literal, Optional
 from fastapi import HTTPException, status
 from pydantic import BaseModel, Field, IPvAnyAddress
-from models.authentication import BaseUser
 
 load_dotenv()
 
@@ -105,7 +104,7 @@ class AdbSendTextMessageRequest(AdbConnectDeviceRequest):
     message: str
 
 
-class AdbMessageSentResponse(BaseUser, AdbDetailResponse, AdbConnectDeviceRequest):
+class AdbMessageSentResponse(AdbDetailResponse, AdbConnectDeviceRequest):
     messages_sent: int
     message_content: str
 
