@@ -15,6 +15,7 @@ from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
 from utils.logger import create_logger
 from utils.adb_wireless import start_terminal_pairing_session
+from utils.scheduler import start_scheduler
 
 load_dotenv()
 
@@ -53,6 +54,8 @@ async def lifespan(app: FastAPI):
         log.debug("Starting terminal-based QR pairing session as per configuration.")
         start_terminal_pairing_session(300)
 
+    start_scheduler()
+    
     log.info(f"Admin Credentials: Username='{ADMIN_USERNAME}' Password='{ADMIN_PASSWORD}'")
     yield
 

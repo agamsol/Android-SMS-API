@@ -4,6 +4,9 @@ from datetime import datetime, date
 from calendar import monthrange
 from dotenv import load_dotenv
 from utils.logger import create_logger
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from utils.updater import check_for_updates, UPDATE_CHECK_INTERVAL_DAYS, FETCH_UPDATES_FROM_GITHUB
 
 load_dotenv()
 
@@ -80,3 +83,25 @@ def get_billing_cycle_end(reset_day: int = PLAN_RESET_DAY_OF_MONTH) -> int:
 
     log.debug(f"Billing cycle end (next reset): {cycle_end.strftime('%Y-%m-%d')} (timestamp: {timestamp}), reset_day={reset_day}")
     return timestamp
+
+
+def start_scheduler():
+    """
+    Starts the AsyncIOScheduler and adds necessary jobs.
+    """
+    scheduler = AsyncIOScheduler()
+
+    if FETCH_UPDATES_FROM_GITHUB:
+        log.info(f"Scheduling update checks every {UPDATE_CHECK_INTERVAL_DAYS} days.")
+        
+        scheduler.add_job(check_for_updates, 'date')
+        
+        scheduler.add_job(
+            check_for_updates,
+            IntervalTrigger(days=UPDATE_CHECK_INTERVAL_DAYS),
+            id='update_checker',
+            replace_existing=True
+        )
+
+    scheduler.start()
+
