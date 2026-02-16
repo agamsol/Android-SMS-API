@@ -4,10 +4,9 @@ from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
-from models.authentication import CreateUser, Token, AdditionalAccountData, CreateUserParams, LoginObtainToken, login_obtain_token, AccountConfirmationResponse, BaseUser, MUST_BE_ADMINISTRATOR_EXCEPTION, ResetAccountPasswordRequest, UpdateMessageLimitRequest, MessageLimitUpdateResponse, generate_random_password, UserListResponse, UserStats
-from utils.models.database import User_Model
+from models.authentication import Token, AdditionalAccountData, LoginObtainToken, login_obtain_token,  MUST_BE_ADMINISTRATOR_EXCEPTION, generate_random_password
 from utils.database import SQLiteDb
-from utils.secure import JWToken, Hash
+from utils.secure import JWToken
 from utils.scheduler import get_billing_cycle_start, get_billing_cycle_end
 
 load_dotenv()
@@ -55,7 +54,7 @@ async def authenticate_with_token(
 
             if token_data.username == ADMIN_USERNAME:
 
-                admin_usage = db_helper.count_messages(ADMIN_USERNAME, since_timestamp=get_billing_cycle_start())
+                admin_usage = await db_helper.count_messages(ADMIN_USERNAME, since_timestamp=get_billing_cycle_start())
 
                 return AdditionalAccountData(
                     username=token_data.username,
@@ -71,7 +70,7 @@ async def authenticate_with_token(
 
         try:
             token_id = await JWToken.verify_api_token(token)
-            record = db_helper.get_token_by_id(token_id)
+            record = await db_helper.get_token_by_id(token_id)
             
             if record:
 
@@ -82,7 +81,7 @@ async def authenticate_with_token(
                 if not record['is_active']:
                     raise HTTPException(status_code=403, detail="Token has been revoked")
                     
-                usage = db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
+                usage = await db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
 
                 return AdditionalAccountData(
                     username=record['name'], 
@@ -99,7 +98,7 @@ async def authenticate_with_token(
     if api_key:
         try:
             token_id = await JWToken.verify_api_token(api_key)
-            record = db_helper.get_token_by_id(token_id)
+            record = await db_helper.get_token_by_id(token_id)
             
             if not record:
                  raise credentials_exception
@@ -111,7 +110,7 @@ async def authenticate_with_token(
             if not record['is_active']:
                  raise HTTPException(status_code=403, detail="Token has been revoked")
                  
-            usage = db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
+            usage = await db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
             
             return AdditionalAccountData(
                 username=record['name'], 

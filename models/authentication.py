@@ -3,7 +3,7 @@ import string
 import random
 from typing import Annotated, Literal, Optional
 from fastapi import Form, HTTPException, status
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 MUST_BE_ADMINISTRATOR_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -26,35 +26,6 @@ def generate_random_password(length=10, custom_specials=True):
 class BaseUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     username: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")
-
-
-class CreateUser(BaseUser):
-    password: str = Field(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")
-
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, passwd: str) -> str:
-
-        if not re.search(r"[A-Za-z]", passwd):
-            raise HTTPException(
-                detail="Password must contain at least one letter",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not re.search(r"\d", passwd):
-            raise HTTPException(
-                detail="Password must contain at least one digit",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not re.search(r"[^\w\s]", passwd):
-            raise HTTPException(
-                detail="Password must contain at least one special character",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-
-        return passwd
-
 
 class AdditionalAccountData(BaseUser):
     messages_limit: int = 50
@@ -91,22 +62,6 @@ def login_obtain_token(
         username=username,
         password=password,
         remember_me=remember_me
-    )
-
-
-class CreateUserParams(BaseModel):
-    username: Annotated[str, Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")]
-    password: Annotated[str, Field(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
-    messages_limit: Annotated[int, Field()] = 50
-    administrator: Annotated[bool, Field()] = False
-
-
-class ResetAccountPasswordRequest(CreateUser):
-    password: str = Field(
-        min_length=8,
-        max_length=128,
-        description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.",
-        alias="new_password"
     )
 
 

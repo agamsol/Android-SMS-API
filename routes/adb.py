@@ -63,7 +63,7 @@ async def adb_list_messages(
 
     device_messages = await adb.list_messages(device_id=device_id)
 
-    db_rows = db_helper.get_all_messages()
+    db_rows = await db_helper.get_all_messages()
     grouped = defaultdict(list)
 
     for row in db_rows:
@@ -209,11 +209,11 @@ async def adb_send_text_message(
     messages_sent = 0
 
     if account.token_id:
-        messages_sent = db_helper.count_token_messages(account.token_id, since_timestamp=get_billing_cycle_start())
+        messages_sent = await db_helper.count_token_messages(account.token_id, since_timestamp=get_billing_cycle_start())
         if messages_sent >= account.messages_limit:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Monthly limit exceeded")
     else:
-        messages_sent = db_helper.count_messages(account.username, since_timestamp=get_billing_cycle_start())
+        messages_sent = await db_helper.count_messages(account.username, since_timestamp=get_billing_cycle_start())
 
     try:
 
@@ -233,7 +233,7 @@ async def adb_send_text_message(
                 token_id=account.token_id
             )
 
-            db_helper.insert_message(message_payload)
+            await db_helper.insert_message(message_payload)
 
             return AdbMessageSentResponse(
                 detail="Message has been successfully sent",

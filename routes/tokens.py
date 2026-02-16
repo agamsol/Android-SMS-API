@@ -47,7 +47,7 @@ async def create_token_route(
         created_at=datetime.utcnow()
     )
 
-    created_token = db_helper.create_token(new_token)
+    created_token = await db_helper.create_token(new_token)
 
     if not created_token:
         raise HTTPException(status_code=500, detail="Failed to create token (ID collision?)")
@@ -71,11 +71,11 @@ async def list_tokens(
     if not admin.administrator:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    tokens = db_helper.get_all_tokens()
+    tokens = await db_helper.get_all_tokens()
     result = []
     
     for t in tokens:
-        usage = db_helper.count_token_messages(t['id'], since_timestamp=get_billing_cycle_start())
+        usage = await db_helper.count_token_messages(t['id'], since_timestamp=get_billing_cycle_start())
         result.append(TokenStats(
             id=t['id'],
             name=t['name'],
@@ -101,11 +101,11 @@ async def update_token_route(
     if not admin.administrator:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    existing = db_helper.get_token_by_id(token_id)
+    existing = await db_helper.get_token_by_id(token_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Token not found")
 
-    updated = db_helper.update_token(
+    updated = await db_helper.update_token(
         token_id, 
         limit=update_data.messages_limit, 
         active=update_data.is_active
@@ -114,7 +114,7 @@ async def update_token_route(
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update token")
 
-    usage = db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
+    usage = await db_helper.count_token_messages(token_id, since_timestamp=get_billing_cycle_start())
     
     return TokenStats(
         id=updated['id'],
@@ -137,7 +137,7 @@ async def delete_token_route(
     if not admin.administrator:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    success = db_helper.delete_token(token_id)
+    success = await db_helper.delete_token(token_id)
 
     if not success:
         raise HTTPException(status_code=404, detail="Token not found")
@@ -156,14 +156,14 @@ async def refresh_token_route(
     if not admin.administrator:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    existing = db_helper.get_token_by_id(token_id)
+    existing = await db_helper.get_token_by_id(token_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Token not found")
 
     new_jwt_token = await JWToken.create_api_token(token_id)
     new_token_hash = hashlib.sha256(new_jwt_token.encode()).hexdigest()
 
-    refreshed_token_record = db_helper.refresh_token_id(token_id, new_token_hash)
+    refreshed_token_record = await db_helper.refresh_token_id(token_id, new_token_hash)
 
     if not refreshed_token_record:
         raise HTTPException(status_code=500, detail="Failed to refresh token")

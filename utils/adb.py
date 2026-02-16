@@ -245,7 +245,7 @@ class Adb:
         log.error(f"SMS command failed. Device: {device_name}, Output: {parcel.stdout.strip()}")
         return False, str(device_name)
 
-    def _parse_content_query_output(self, output: str) -> list[dict]:
+    async def _parse_content_query_output(self, output: str) -> list[dict]:
         results = []
         row_pattern = re.compile(r"Row: \d+ (.*)")
 
@@ -283,7 +283,7 @@ class Adb:
         grouped_messages = defaultdict(list)
 
         if sms_process.returncode == 0:
-            sms_rows = self._parse_content_query_output(sms_process.stdout)
+            sms_rows = await self._parse_content_query_output(sms_process.stdout)
             
             for row in sms_rows:
                 msg_type = row.get('type', '1')
@@ -318,7 +318,7 @@ class Adb:
         mms_messages = {}
         if mms_process.returncode == 0:
 
-            mms_rows = self._parse_content_query_output(mms_process.stdout)
+            mms_rows = await self._parse_content_query_output(mms_process.stdout)
 
             for row in mms_rows:
                 m_id = row.get('_id')
@@ -338,7 +338,7 @@ class Adb:
         part_process = await self.adb_execute(part_command)
 
         if part_process.returncode == 0:
-            part_rows = self._parse_content_query_output(part_process.stdout)
+            part_rows = await self._parse_content_query_output(part_process.stdout)
             for row in part_rows:
                 mid = row.get('mid')
                 ct = row.get('ct')
@@ -353,7 +353,7 @@ class Adb:
         addr_process = await self.adb_execute(addr_command)
 
         if addr_process.returncode == 0:
-            addr_rows = self._parse_content_query_output(addr_process.stdout)
+            addr_rows = await self._parse_content_query_output(addr_process.stdout)
             for row in addr_rows:
                 msg_id = row.get('msg_id')
                 address = row.get('address')
@@ -395,8 +395,6 @@ class Adb:
             }
 
             grouped_messages[msg['address']].append(final_msg_entry)
-
-
 
         conversations = []
         for address, msgs in grouped_messages.items():

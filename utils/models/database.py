@@ -3,13 +3,6 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 
-class User_Model(BaseModel):
-    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")
-    hashed_password: str = Field(..., pattern=r"^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$")
-    messages_limit: int = 0
-    administrator: bool = False
-
-
 class APIToken_Model(BaseModel):
     id: str
     name: str
