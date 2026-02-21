@@ -3,7 +3,8 @@ FROM node:22-alpine AS frontend-builder
 
 WORKDIR /frontend
 COPY frontend/android-sms-api/package.json frontend/android-sms-api/package-lock.json ./
-RUN npm ci
+RUN npm install -g npm@latest
+RUN npm ci --legacy-peer-deps
 COPY frontend/android-sms-api/ ./
 RUN npm run build
 
@@ -36,6 +37,7 @@ COPY --from=backend-builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY backend/ .
+RUN cp .env.example .env
 
 COPY --from=frontend-builder /frontend/dist /app/static
 

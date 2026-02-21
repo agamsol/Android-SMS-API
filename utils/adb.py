@@ -177,13 +177,35 @@ class Adb:
         if "Successfully" in process.stdout:
             log.info(f"Successfully paired to {device_address}")
 
+            for i in range(3):
+                
+                connect_with_port = await self.connect_device(
+                    device_address=str(device_address) + ":" + str(port),
+                    disable_tcpip_command=True,
+                    timeout=3
+                )
+
+                if "connected" in connect_with_port.stdout or "already" in connect_with_port.stdout:
+                    log.info(f"Successfully connected to {device_address}")
+                    break
+
+                connect_without_port = await self.connect_device(
+                    device_address=str(device_address),
+                    disable_tcpip_command=True,
+                    timeout=3
+                )
+
+                if "connected" in connect_without_port.stdout or "already" in connect_without_port.stdout:
+                    log.info(f"Successfully connected to {device_address}")
+                    break
+
         else:
 
             log.error(f"Pairing attempt failed for {device_address}. Output: {process.stdout.strip()}")
 
         return process
 
-    async def connect_device(self, device_address: IPvAnyAddress = None, adb_port: int = 5555, disable_tcpip_command=False):
+    async def connect_device(self, device_address: IPvAnyAddress = None, adb_port: int = 5555, disable_tcpip_command=False, timeout: int = 10):
 
         if not disable_tcpip_command:
 
@@ -196,7 +218,8 @@ class Adb:
         log.info(f"Connecting to device via network: {device_address}")
 
         process = await self.adb_execute(
-            ['connect', str(device_address)]
+            ['connect', str(device_address)],
+            timeout=timeout
         )
 
         if "connected" in process.stdout or "already" in process.stdout:
@@ -269,7 +292,7 @@ class Adb:
             command=adb_command
         )
 
-        if re.search(r"Result: Parcel\([0-9a-fA-F]+\s+'.*'\)", str(parcel.stdout)):
+        if re.search(r"Result: Parcel\s*\(\s*[0-9a-fA-F\s]+'.*'\s*\)", str(parcel.stdout)):
             log.info(f"SMS command executed successfully via {device_name}.")
             return True, str(device_name)
 
