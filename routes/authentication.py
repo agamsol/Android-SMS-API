@@ -3,6 +3,7 @@ import hashlib
 from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
+from jose.exceptions import JWTError
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from models.authentication import Token, AdditionalAccountData, LoginObtainToken, login_obtain_token, MUST_BE_ADMINISTRATOR_EXCEPTION, generate_random_password, ResetPasswordRequest, ResetPasswordResponse, DEFAULT_PASSWORD
 from utils.database import SQLiteDb
@@ -95,12 +96,14 @@ async def authenticate_with_token(
                     next_plan_reset=get_billing_cycle_end(),
                     token_id=token_id
                 )
-        except ValueError:
+        except (ValueError, JWTError):
             pass
 
     if api_key:
+
         try:
             token_id = await JWToken.verify_api_token(api_key)
+
             record = await db_helper.get_token_by_id(token_id)
             
             if not record:
@@ -123,7 +126,7 @@ async def authenticate_with_token(
                 token_id=token_id
             )
             
-        except ValueError:
+        except (ValueError, JWTError):
             pass
              
     raise credentials_exception
@@ -201,9 +204,10 @@ async def reset_password(
 
         try:
             token_data = await JWToken.verify(token)
+
             if token_data.username == ADMIN_USERNAME:
                 authenticated = True
-        except ValueError:
+        except (ValueError, JWTError):
             pass
 
     if not authenticated and body.current_password:

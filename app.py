@@ -21,7 +21,7 @@ from colorama import Fore, Style
 
 load_dotenv()
 
-VERSION = os.getenv("VERSION", "0.4")
+VERSION = os.getenv("VERSION", "0.5")
 ADB_QR_DEVICE_PAIRING = os.getenv("ADB_QR_DEVICE_PAIRING", "true").lower() == "true"
 ADB_AUTO_CONNECT = os.getenv("ADB_AUTO_CONNECT", "false").lower() == "true"
 ADB_DEFAULT_DEVICE = os.getenv("ADB_DEFAULT_DEVICE")
@@ -33,7 +33,6 @@ db_helper = SQLiteDb(database_path=DATABASE_PATH)
 database = db_helper.connect()
 
 log = create_logger(alias="APP", logger_name="ASA_APP")
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -75,6 +74,7 @@ async def lifespan(app: FastAPI):
     port = 8000
 
     if is_default:
+
         log.warning(f"""\n
 {Fore.YELLOW}{Style.BRIGHT}{'=' * 60}
   ⚠  DEFAULT PASSWORD DETECTED — MUST BE CHANGED
@@ -282,4 +282,4 @@ else:
 if __name__ == "__main__":
 
     log.info("Starting Uvicorn server environment...")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_config=None)

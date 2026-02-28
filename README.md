@@ -1,17 +1,17 @@
-# Android SMS API Gateway 0.4 *(Pre-Release)*
-![Version](https://img.shields.io/badge/Version-0.4_(Pre--Release)-orange)
+# Android SMS API Gateway 0.5 (Pre-Release)
+![Version](https://img.shields.io/badge/Version-0.5_(Pre--Release)-orange) ![Released](https://img.shields.io/badge/Released-28.02.2026-blue)
 ![Python](https://img.shields.io/badge/Python-3.13+-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Powered-009688?logo=fastapi&logoColor=white)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen)
+
 ### Turn your Android device into a professional SMS Server
 
-This application transforms any Android device into a dedicated, self-hosted **SMS Gateway**. It provides a robust **RESTful API** that allows you to programmatically send SMS messages over your cellular network, manage device connections via ADB, and enforce secure, role-based access control for multiple users or services.
-
-> **_P.S. Parts of this release are preperations for the UI Interface which is coming VERY soon!_**
+This application transforms any Android device into a dedicated, self-hosted **SMS Gateway**. It provides a robust **RESTful API** that allows you to programmatically send SMS messages over your cellular network, manage device connections via ADB, enforce secure, role-based access control for multiple users or services, and manage everything through its fully-integrated **UI Dashboard**.
 
 ## Table of Contents
 
 - [Features & Capabilities](#features--capabilities)
+- [Dashboard](#dashboard)
 - [System Architecture](#system-architecture)
   - [Authentication & Security](#authentication--security)
 - [Deployment](#deployment)
@@ -31,7 +31,8 @@ This application transforms any Android device into a dedicated, self-hosted **S
     - [Trigger the QR Code](#trigger-the-qr-code)
     - [Pairing Instructions](#pairing-instructions)
     - [Verify Connection](#verify-connection)
-- [Whats New In 0.4](#whats-new-in-04-pre-release)
+- [What's New in 0.5](#whats-new-in-05)
+- [Version Archive](#version-archive)
 
 ---
 
@@ -45,6 +46,37 @@ This application transforms any Android device into a dedicated, self-hosted **S
 * **Simple Authentication**: Secure access via JWT-based tokens.
 
 > **Note on Message Content:** Currently, the send-message endpoint supports **ASCII/Plain text only**. Emoji support is in development and is not supported (YET).
+
+---
+
+## Dashboard
+
+The built-in UI Dashboard provides a clean and modern interface for managing your gateway, viewing conversations, monitoring connected devices, and administrating API tokens.
+### Main Messages Page
+
+![Chats](assets/images/chats.png)
+<br>
+
+<details>
+<summary><strong>View more screenshots</strong></summary>
+
+<br>
+
+### Devices Management Page
+
+![Devices](assets/images/devices.png)
+<br>
+
+### API Keys Management Page
+
+![API Keys](assets/images/api_keys.png)
+<br>
+
+### Settings Page
+
+![Settings](assets/images/settings.png)
+
+</details>
 
 ---
 
@@ -278,7 +310,29 @@ After scanning, the pairing process completes automatically. You can confirm suc
 * Checking the terminal logs for a "Successfully Paired" message.
 * Calling the `GET /adb/list-devices` endpoint to verify your device appears with the status `authorized`.
 
-# What's New in 0.4 (Pre-release)
+# What's New in 0.5 (Pre-Release)
+![Version](https://img.shields.io/badge/Version-0.5_(Pre--Release)-orange) ![Released](https://img.shields.io/badge/Released-28.02.2026-blue)
+
+The main feature of version 0.5 is the new **UI Dashboard**!
+
+#### New Features
+*   **UI Dashboard**: Introducing the new UI Dashboard (Still Closed Source) which lives within the same Docker image.
+*   **MMS Support**: The routing for `GET /adb/list-messages` now supports MMS Messages.
+*   **Update Notifications**: Added a `latest_version` fetch to `/auth/@me` to notify users automatically of updates when available via the Dashboard.
+*   **Password Reset**: Added a new password-reset route.
+
+#### Improvements & Fixes
+*   **Message Retention**: Core database change in the `messages` table - messages are no longer deleted from the table at the monthly reset date, so they continue to show up in the chat history.
+*   **Asynchronous Utils**: `utils/database.py` and `utils/adb.py` now serve their functions as asynchronous.
+*   **Code Pairing Fix**: Fixed an issue where code pairing did not connect to the device automatically after the pairing process.
+*   **Cleanup**: Partial leftovers cleanup for the deprecated user feature.
+
+# Version Archive
+
+<details>
+<summary><strong>What's New in 0.4 (Pre-release)</strong></summary>
+
+![Version](https://img.shields.io/badge/Version-0.4_(Pre--Release)-orange) ![Released](https://img.shields.io/badge/Released-12.02.2026-blue)
 
 #### Token-Based Authentication & System Overhaul
 Version 0.4 introduces a major overhaul to the authentication system, replacing traditional user accounts with a more robust **API Token** system.
@@ -294,3 +348,49 @@ Version 0.4 introduces a major overhaul to the authentication system, replacing 
 *   **Expanded Access**: API Tokens can now access `/adb/list-devices`.
 *   **Status Info**: `GET /auth/@me` now returns detailed quota information.
 
+</details>
+
+<details>
+<summary><strong>What's New in 0.3 (Pre-release)</strong></summary>
+
+![Version](https://img.shields.io/badge/Version-0.3_(Pre--Release)-orange) ![Released](https://img.shields.io/badge/Released-03.02.2026-blue)
+
+#### Features & Improvements
+*   Added a route to get and list all conversations on the device.
+*   Added a route to list all users.
+*   `GET /auth/@me` now returns how many messages are left for the current month.
+
+> **_P.S. Parts of this release are preperations for the UI Interface which is coming VERY soon!_**
+
+#### Bug Fixes
+*   Timeout handling for ADB `POST /adb/connect-device` - trace back to client.
+*   `device_id` was limited to 35 characters (raised to 99) - code pairing devices have longer names than 35 characters.
+
+</details>
+
+<details>
+<summary><strong>What's New in 0.2 (Pre-release)</strong></summary>
+
+![Version](https://img.shields.io/badge/Version-0.2_(Pre--Release)-orange) ![Released](https://img.shields.io/badge/Released-20.01.2026-blue)
+
+#### Features & Improvements
+*   Added a new API route to support pairing devices via a 6-digit code, offering an alternative to QR code scanning.
+*   Replaced the embedded ADB binary with the system-level `android-tools-adb` package. This improves stability and compatibility across different container environments.
+
+#### Bug Fixes
+*   Fixed major bugs that made delete-account endpoint not to work.
+*   Resolved connectivity issues preventing successful wireless device pairing in Dockerized environments.
+*   Fixed an issue where remember_me tokens were not persisting correctly; tokens now utilize a 10-year expiration for long-term sessions.
+*   Corrected username validator logic and pattern. Usernames can now be 3–32 characters long, include numbers and hyphens (previously restricted to 10 characters maximum and no numbers were allowed).
+
+</details>
+
+<details>
+<summary><strong>What's New in 0.1 (Initial Release)</strong></summary>
+
+![Version](https://img.shields.io/badge/Version-0.1-brightgreen) ![Released](https://img.shields.io/badge/Released-05.01.2026-blue)
+
+#### Initial Release
+* First release of the Android SMS API Gateway.
+
+</details>
