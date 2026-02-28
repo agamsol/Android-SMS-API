@@ -20,7 +20,7 @@ if not ADMIN_PASSWORD:
 
     ADMIN_PASSWORD = DEFAULT_PASSWORD
 
-    set_key(dotenv_path=ENV_PATH, key_to_set="ADMIN_PASSWORD", value_to_set=ADMIN_PASSWORD)
+set_key(dotenv_path=ENV_PATH, key_to_set="ADMIN_PASSWORD", value_to_set=ADMIN_PASSWORD)
 
 
 def get_admin_password() -> str:
@@ -71,7 +71,7 @@ async def authenticate_with_token(
                     token_id=ADMIN_USERNAME
                 )
 
-        except ValueError:
+        except (ValueError, JWTError):
             pass 
 
         try:
