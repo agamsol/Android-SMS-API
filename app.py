@@ -13,9 +13,11 @@ from routes import health, authentication, adb, tokens
 from routes.authentication import ADMIN_USERNAME, ADMIN_PASSWORD
 from routes.adb import adb as adb_library
 from models.errors import ErrorResponse
+from models.authentication import DEFAULT_PASSWORD
 from utils.logger import create_logger
 from utils.adb_wireless import start_terminal_pairing_session
 from utils.scheduler import start_scheduler
+from colorama import Fore, Style
 
 load_dotenv()
 
@@ -51,12 +53,62 @@ async def lifespan(app: FastAPI):
 
     if (connection_failed and ADB_QR_DEVICE_PAIRING) or (not ADB_AUTO_CONNECT and ADB_QR_DEVICE_PAIRING):
 
-        log.debug("Starting terminal-based QR pairing session as per configuration.")
-        start_terminal_pairing_session(300)
+        try:
+            existing_devices = await adb_library.get_devices()
+
+            if existing_devices:
+                log.info(f"Skipping QR pairing — {len(existing_devices)} device(s) already connected to ADB.")
+
+            else:
+                log.debug("Starting terminal-based QR pairing session as per configuration.")
+                start_terminal_pairing_session(300)
+
+        except Exception:
+            log.debug("Starting terminal-based QR pairing session as per configuration.")
+            start_terminal_pairing_session(300)
 
     start_scheduler()
-    
-    log.info(f"Admin Credentials: Username='{ADMIN_USERNAME}' Password='{ADMIN_PASSWORD}'")
+
+    current_password = ADMIN_PASSWORD
+    is_default = current_password == DEFAULT_PASSWORD
+    host = "localhost"
+    port = 8000
+
+    if is_default:
+        log.warning(f"""\n
+{Fore.YELLOW}{Style.BRIGHT}{'=' * 60}
+  ⚠  DEFAULT PASSWORD DETECTED — MUST BE CHANGED
+{'=' * 60}{Style.RESET_ALL}
+  {Fore.CYAN}Username:{Style.RESET_ALL}  {Style.BRIGHT}{ADMIN_USERNAME}{Style.RESET_ALL}
+  {Fore.CYAN}Password:{Style.RESET_ALL}  {Style.BRIGHT}{current_password}{Style.RESET_ALL}
+
+  {Fore.YELLOW}The default password must be changed before login.{Style.RESET_ALL}
+  {Fore.YELLOW}Set a new password via the web UI or update:{Style.RESET_ALL}
+  {Fore.WHITE}{Style.BRIGHT}  .env → ADMIN_PASSWORD=YourNewPassword{Style.RESET_ALL}
+
+  {Fore.YELLOW}Password requirements:{Style.RESET_ALL}
+  {Fore.WHITE}  • At least 8 characters{Style.RESET_ALL}
+  {Fore.WHITE}  • At least one letter (a-z, A-Z){Style.RESET_ALL}
+  {Fore.WHITE}  • At least one digit (0-9){Style.RESET_ALL}
+  {Fore.WHITE}  • At least one special character (!@#$%^&* etc.){Style.RESET_ALL}
+
+  {Fore.CYAN}Dashboard:{Style.RESET_ALL}  {Style.BRIGHT}http://{host}:{port}{Style.RESET_ALL}
+  {Fore.CYAN}API Docs:{Style.RESET_ALL}   {Style.BRIGHT}http://{host}:{port}/docs{Style.RESET_ALL}
+{Fore.YELLOW}{Style.BRIGHT}{'=' * 60}{Style.RESET_ALL}
+""")
+    else:
+        log.info(f"""\n
+{Fore.GREEN}{Style.BRIGHT}{'─' * 50}
+  ✓  Admin Credentials
+{'─' * 50}{Style.RESET_ALL}
+  {Fore.CYAN}Username:{Style.RESET_ALL}  {Style.BRIGHT}{ADMIN_USERNAME}{Style.RESET_ALL}
+  {Fore.CYAN}Password:{Style.RESET_ALL}  {Style.BRIGHT}{current_password}{Style.RESET_ALL}
+
+  {Fore.CYAN}Dashboard:{Style.RESET_ALL}  {Style.BRIGHT}http://{host}:{port}{Style.RESET_ALL}
+  {Fore.CYAN}API Docs:{Style.RESET_ALL}   {Style.BRIGHT}http://{host}:{port}/docs{Style.RESET_ALL}
+{Fore.GREEN}{Style.BRIGHT}{'─' * 50}{Style.RESET_ALL}
+""")
+
     yield
 
 

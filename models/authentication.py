@@ -3,7 +3,9 @@ import string
 import random
 from typing import Annotated, Literal, Optional
 from fastapi import Form, HTTPException, status
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+
+DEFAULT_PASSWORD = "123456"
 
 MUST_BE_ADMINISTRATOR_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,13 +26,13 @@ def generate_random_password(length=10, custom_specials=True):
 
 class LoginObtainToken(BaseModel):
     username: Annotated[str, Form(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")]
-    password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")]
+    password: Annotated[str, Form(min_length=1, max_length=128)]
     remember_me: Annotated[bool, Form()] = False
 
 
 def login_obtain_token(
     username: Annotated[str, Form(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9-]+$")],
-    password: Annotated[str, Form(min_length=8, max_length=128, description="Password must be at least 8 characters long and include at least one letter, one digit, and one special character.")],
+    password: Annotated[str, Form(min_length=1, max_length=128)],
     remember_me: Annotated[bool, Form()] = False
 ):
 
@@ -83,3 +85,30 @@ class TokenStats(BaseModel):
     is_active: bool
     created_at: str # datetime serialized
 
+
+class ResetPasswordRequest(BaseModel):
+    current_password: Optional[str] = Field(
+        "123456",
+        description="Current password. Required if not using JWT authentication. Only accepted when the current password is the default ('123456')."
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="New password. Must be at least 8 characters with at least one letter, one digit, and one special character."
+    )
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r'[a-zA-Z]', v):
+            raise ValueError('Password must contain at least one letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r'[^a-zA-Z0-9]', v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    detail: str = Field(description="Result message")

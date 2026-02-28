@@ -4,25 +4,30 @@ from dotenv import load_dotenv, set_key
 from typing import Annotated
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
-from models.authentication import Token, AdditionalAccountData, LoginObtainToken, login_obtain_token, MUST_BE_ADMINISTRATOR_EXCEPTION, generate_random_password
+from models.authentication import Token, AdditionalAccountData, LoginObtainToken, login_obtain_token, MUST_BE_ADMINISTRATOR_EXCEPTION, generate_random_password, ResetPasswordRequest, ResetPasswordResponse, DEFAULT_PASSWORD
 from utils.database import SQLiteDb
 from utils.secure import JWToken
 from utils.scheduler import get_billing_cycle_start, get_billing_cycle_end
 
-load_dotenv()
+ENV_PATH = ".env"
+load_dotenv(ENV_PATH)
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 if not ADMIN_PASSWORD:
 
-    ADMIN_PASSWORD = generate_random_password()
+    ADMIN_PASSWORD = DEFAULT_PASSWORD
 
-    set_key(
-        dotenv_path=".env",
-        key_to_set="ADMIN_PASSWORD",
-        value_to_set=ADMIN_PASSWORD
-    )
+    set_key(dotenv_path=ENV_PATH, key_to_set="ADMIN_PASSWORD", value_to_set=ADMIN_PASSWORD)
+
+
+def get_admin_password() -> str:
+    """Read the current admin password from .env (source of truth)."""
+
+    load_dotenv(ENV_PATH, override=True)
+
+    return os.getenv("ADMIN_PASSWORD", DEFAULT_PASSWORD)
 
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/Android-SMS-API.db")
 db_helper = SQLiteDb(database_path=DATABASE_PATH)
@@ -155,8 +160,16 @@ async def login_for_access_token(
 
     if credentials.username == ADMIN_USERNAME:
 
-        if not ((credentials.username == ADMIN_USERNAME) and (credentials.password == ADMIN_PASSWORD)):
+        current_password = get_admin_password()
+
+        if credentials.password != current_password:
             raise credentials_exception
+
+        if current_password == DEFAULT_PASSWORD:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Password must be changed before logging in. Use PATCH /auth/reset-password to set a new password.",
+            )
 
         access_token = await JWToken.create(username=ADMIN_USERNAME, remember_me=credentials.remember_me)
 
@@ -168,4 +181,48 @@ async def login_for_access_token(
     raise credentials_exception
 
 
+@router.patch(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Authentication"],
+    summary="Reset admin password",
+    description="Reset the admin password. Authenticate either via a valid JWT token (Bearer header) or by providing the current default password ('123456') in the request body."
+)
+async def reset_password(
+    body: ResetPasswordRequest,
+    token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+):
+    authenticated = False
 
+    current_password = get_admin_password()
+
+    if token:
+
+        try:
+            token_data = await JWToken.verify(token)
+            if token_data.username == ADMIN_USERNAME:
+                authenticated = True
+        except ValueError:
+            pass
+
+    if not authenticated and body.current_password:
+
+        if current_password == DEFAULT_PASSWORD and body.current_password == DEFAULT_PASSWORD:
+            authenticated = True
+
+    if not authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed. Provide a valid JWT token or the current default password.",
+        )
+
+    set_key(
+        dotenv_path=ENV_PATH,
+        key_to_set="ADMIN_PASSWORD",
+        value_to_set=body.new_password
+    )
+
+    return ResetPasswordResponse(
+        detail="Password has been reset successfully."
+    )
